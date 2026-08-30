@@ -12,7 +12,7 @@
 import { json, errorResponse, clientIp } from './lib/http.js';
 import {
     corsHeaders,
-    originAllowed,
+    matchOrigin,
     parseAllowedOrigins,
     preflightResponse
 } from './lib/cors.js';
@@ -98,7 +98,11 @@ const ROUTES = [
         path: '/api/v1/posts',
         access: 'member',
         handler: createPost,
-        limit: { name: 'post-create', limit: 10, windowSec: HOUR, by: 'user' }
+        limits: [
+            { name: 'post-create', limit: 10, windowSec: HOUR, by: 'user' },
+            // Secondary cap: many "users" from one address is abuse.
+            { name: 'post-create-ip', limit: 20, windowSec: HOUR, by: 'ip' }
+        ]
     },
     {
         method: 'GET',
@@ -135,14 +139,14 @@ const ROUTES = [
         path: '/api/v1/posts/:id/vote',
         access: 'member',
         handler: addVote,
-        limit: { name: 'vote', limit: 60, windowSec: HOUR, by: 'user' }
+        limits: [{ name: 'vote', limit: 60, windowSec: HOUR, by: 'user' }]
     },
     {
         method: 'DELETE',
         path: '/api/v1/posts/:id/vote',
         access: 'member',
         handler: removeVote,
-        limit: { name: 'vote', limit: 60, windowSec: HOUR, by: 'user' }
+        limits: [{ name: 'vote', limit: 60, windowSec: HOUR, by: 'user' }]
     },
     {
         method: 'GET',
@@ -155,7 +159,7 @@ const ROUTES = [
         path: '/api/v1/posts/:id/comments',
         access: 'member',
         handler: createComment,
-        limit: { name: 'comment', limit: 30, windowSec: HOUR, by: 'user' }
+        limits: [{ name: 'comment', limit: 30, windowSec: HOUR, by: 'user' }]
     },
     {
         method: 'PATCH',
@@ -210,7 +214,7 @@ const ROUTES = [
         path: '/api/v1/events',
         access: 'public',
         handler: ingestEvents,
-        limit: { name: 'events', limit: 600, windowSec: HOUR, by: 'ip' }
+        limits: [{ name: 'events', limit: 600, windowSec: HOUR, by: 'ip' }]
     },
     {
         method: 'POST',
@@ -224,12 +228,19 @@ const ROUTES = [
         access: 'staff',
         handler: exportAll
     },
-    { method: 'GET', path: '/auth/sso', access: 'public', handler: sso },
+    {
+        method: 'GET',
+        path: '/auth/sso',
+        access: 'public',
+        handler: sso,
+        limits: [{ name: 'sso', limit: 30, windowSec: HOUR, by: 'ip' }]
+    },
     {
         method: 'GET',
         path: '/api/v1/auth/access/jwt',
         access: 'public',
-        handler: sso
+        handler: sso,
+        limits: [{ name: 'sso', limit: 30, windowSec: HOUR, by: 'ip' }]
     },
     { method: 'POST', path: '/auth/logout', access: 'public', handler: logout }
 ];
@@ -260,7 +271,9 @@ function checkCookieOrigin(c, allowed) {
     if (['GET', 'HEAD', 'OPTIONS'].includes(c.request.method)) return null;
     const origin = c.request.headers.get('Origin');
     if (!origin) return errorResponse('origin header required', 403);
-    if (originAllowed(origin, allowed)) return null;
+    // Only EXACT allow-list entries may ride the session cookie; wildcard
+    // entries cover shared-suffix hosting where any tenant could match.
+    if (matchOrigin(origin, allowed) === 'exact') return null;
     try {
         if (c.env.PUBLIC_URL && new URL(c.env.PUBLIC_URL).origin === origin) {
             return null;
@@ -277,22 +290,21 @@ function checkCookieOrigin(c, allowed) {
  * @returns {Promise<Response | null>}
  */
 async function checkRoutedRateLimit(route, c) {
-    if (!route.limit) return null;
-    // Prefer the JWT sub over users.id: the id may not exist until the
-    // first write, and the subject must be stable across a window.
-    const subject =
-        route.limit.by === 'user'
-            ? String(
-                  c.auth?.claims?.sub ?? c.auth?.userId ?? clientIp(c.request)
-              )
-            : clientIp(c.request);
-    const allowed = await checkRateLimit(
-        c.env,
-        route.limit.name,
-        subject,
-        route.limit
-    );
-    return allowed ? null : errorResponse('rate limit exceeded', 429);
+    for (const limit of route.limits ?? []) {
+        // Prefer the JWT sub over users.id: the id may not exist until the
+        // first write, and the subject must be stable across a window.
+        const subject =
+            limit.by === 'user'
+                ? String(
+                      c.auth?.claims?.sub ??
+                          c.auth?.userId ??
+                          clientIp(c.request)
+                  )
+                : clientIp(c.request);
+        const allowed = await checkRateLimit(c.env, limit.name, subject, limit);
+        if (!allowed) return errorResponse('rate limit exceeded', 429);
+    }
+    return null;
 }
 
 /**
@@ -367,9 +379,12 @@ export function createFeedbackApp(options = {}) {
          * @param {Record<string, any>} env
          */
         async scheduled(_event, env) {
+            // Compare in the same ISO-8601 'T'/'Z' shape events are stored
+            // in; datetime() emits a space separator, which is off-by-a-hair
+            // against ISO strings at the boundary.
             await env.DB.prepare(
-                `DELETE FROM events
-                 WHERE created_at < datetime('now', '-180 days')`
+                `DELETE FROM events WHERE created_at <
+                 strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-180 days')`
             ).run();
         }
     };

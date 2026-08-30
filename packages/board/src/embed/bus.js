@@ -18,6 +18,7 @@ import {
 export function createChildBus(handlers) {
     /** @type {string | null} set from init; validates later messages */
     let hostOrigin = null;
+    let initialized = false;
 
     /**
      * @param {string} type
@@ -33,16 +34,35 @@ export function createChildBus(handlers) {
         );
     }
 
+    /**
+     * First valid init wins; later inits (or ones whose claimed hostOrigin
+     * does not match where the message actually came from) are ignored so
+     * another window cannot swap our config after boot.
+     * @param {any} data
+     * @param {MessageEvent} event
+     */
+    function handleInit(data, event) {
+        if (initialized) return;
+        if (
+            typeof data.hostOrigin === 'string' &&
+            data.hostOrigin !== event.origin
+        ) {
+            return;
+        }
+        hostOrigin =
+            typeof data.hostOrigin === 'string'
+                ? data.hostOrigin
+                : event.origin;
+        initialized = true;
+        handlers.onInit(data);
+    }
+
     /** @param {MessageEvent} event */
     function onMessage(event) {
         const data = event.data;
         if (!data || data.ns !== MESSAGE_NAMESPACE) return;
         if (data.type === MESSAGE_TYPES.INIT) {
-            hostOrigin =
-                typeof data.hostOrigin === 'string'
-                    ? data.hostOrigin
-                    : event.origin;
-            handlers.onInit(data);
+            handleInit(data, event);
             return;
         }
         // Everything after init must come from the announced host origin.

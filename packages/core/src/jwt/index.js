@@ -116,28 +116,34 @@ function decodeJsonSegment(b64) {
 /**
  * @param {unknown} claims
  * @param {number} clockSkewSec
+ * @param {boolean} requireExp
  * @returns {claims is Record<string, unknown>}
  */
-function claimsAreValid(claims, clockSkewSec) {
+function claimsAreValid(claims, clockSkewSec, requireExp) {
     if (!claims || typeof claims !== 'object' || Array.isArray(claims)) {
         return false;
     }
     const { sub, exp } = /** @type {Record<string, unknown>} */ (claims);
     if (typeof sub !== 'string' || sub.length === 0) return false;
-    if (exp === undefined) return true;
+    if (exp === undefined) return !requireExp;
     if (typeof exp !== 'number') return false;
     return exp + clockSkewSec >= Math.floor(Date.now() / 1000);
 }
 
 /**
  * Verify an HS256 JWT and return its claims, or null on any failure.
- * Requires `sub`; enforces `exp` (with clock skew) when present.
+ * Requires `sub` and, by default, a numeric `exp` (enforced with clock
+ * skew) — pass `requireExp: false` to accept non-expiring tokens.
  * @param {string} token
  * @param {string} secret
- * @param {{ clockSkewSec?: number }} [options]
+ * @param {{ clockSkewSec?: number, requireExp?: boolean }} [options]
  * @returns {Promise<Record<string, unknown> | null>}
  */
-export async function verifyJwt(token, secret, { clockSkewSec = 60 } = {}) {
+export async function verifyJwt(
+    token,
+    secret,
+    { clockSkewSec = 60, requireExp = true } = {}
+) {
     if (typeof token !== 'string' || typeof secret !== 'string') return null;
     const parts = token.split('.');
     if (parts.length !== 3) return null;
@@ -145,7 +151,7 @@ export async function verifyJwt(token, secret, { clockSkewSec = 60 } = {}) {
     const header = decodeJsonSegment(headerB64);
     const claims = decodeJsonSegment(payloadB64);
     if (!header || /** @type {any} */ (header).alg !== 'HS256') return null;
-    if (!claimsAreValid(claims, clockSkewSec)) return null;
+    if (!claimsAreValid(claims, clockSkewSec, requireExp)) return null;
     const ok = await hmacVerify(
         `${headerB64}.${payloadB64}`,
         signature,

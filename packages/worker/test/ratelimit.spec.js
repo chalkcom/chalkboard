@@ -34,6 +34,46 @@ describe('rate limiting', () => {
     });
 });
 
+describe('rate limiting /auth/sso', () => {
+    it('returns 429 after 30 attempts from one IP, alias shares the bucket', async () => {
+        const { call } = makeApp();
+        for (let i = 0; i < 30; i += 1) {
+            const res = await call('/auth/sso?jwt=garbage');
+            expect(res.status).toBe(401);
+        }
+        const blocked = await call('/auth/sso?jwt=garbage');
+        expect(blocked.status).toBe(429);
+        // The Featurebase-shaped alias draws from the same 'sso' bucket.
+        const aliasBlocked = await call('/api/v1/auth/access/jwt?jwt=garbage');
+        expect(aliasBlocked.status).toBe(429);
+    });
+});
+
+describe('rate limiting post creation per IP', () => {
+    it('caps many users behind one IP at 20 posts/hour', async () => {
+        const { call } = makeApp();
+        // Two users spend 10 posts each (per-user limit), all from the
+        // same client IP; a third user then trips the per-IP cap.
+        for (const sub of ['ip-user-1', 'ip-user-2']) {
+            const jwt = await memberJwt({ sub, email: `${sub}@x.com` });
+            for (let i = 0; i < 10; i += 1) {
+                const res = await call('/api/v1/posts', {
+                    method: 'POST',
+                    jwt,
+                    body: { title: `Post ${sub} ${i}` }
+                });
+                expect(res.status).toBe(201);
+            }
+        }
+        const third = await call('/api/v1/posts', {
+            method: 'POST',
+            jwt: await memberJwt({ sub: 'ip-user-3', email: 'u3@x.com' }),
+            body: { title: 'Over the IP cap' }
+        });
+        expect(third.status).toBe(429);
+    });
+});
+
 describe('events ingestion', () => {
     it('accepts valid events and rejects unknown types', async () => {
         const { call } = makeApp();

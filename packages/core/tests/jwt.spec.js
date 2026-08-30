@@ -33,17 +33,18 @@ describe('signJwt / verifyJwt', () => {
     });
 
     it('rejects a bad signature', async () => {
-        const token = await signJwt({ sub: 'u1' }, SECRET);
+        const token = await signJwt({ sub: 'u1', exp: now() + 3600 }, SECRET);
         expect(await verifyJwt(token, 'other-secret')).toBeNull();
         expect(await verifyJwt(token.slice(0, -2) + 'xx', SECRET)).toBeNull();
     });
 
     it('rejects tampered payloads', async () => {
-        const token = await signJwt({ sub: 'u1', role: 'member' }, SECRET);
+        const exp = now() + 3600;
+        const token = await signJwt({ sub: 'u1', role: 'member', exp }, SECRET);
         const [h, , s] = token.split('.');
         const forged = base64urlEncode(
             new TextEncoder().encode(
-                JSON.stringify({ sub: 'u1', role: 'staff' })
+                JSON.stringify({ sub: 'u1', role: 'staff', exp })
             )
         );
         expect(await verifyJwt(`${h}.${forged}.${s}`, SECRET)).toBeNull();
@@ -61,8 +62,30 @@ describe('signJwt / verifyJwt', () => {
     });
 
     it('requires sub', async () => {
-        const token = await signJwt({ email: 'a@b.c' }, SECRET);
+        const token = await signJwt(
+            { email: 'a@b.c', exp: now() + 3600 },
+            SECRET
+        );
         expect(await verifyJwt(token, SECRET)).toBeNull();
+    });
+
+    it('requires a numeric exp by default', async () => {
+        const noExp = await signJwt({ sub: 'u1' }, SECRET);
+        expect(await verifyJwt(noExp, SECRET)).toBeNull();
+        const stringExp = await signJwt({ sub: 'u1', exp: 'never' }, SECRET);
+        expect(await verifyJwt(stringExp, SECRET)).toBeNull();
+    });
+
+    it('accepts a missing exp only with requireExp: false', async () => {
+        const noExp = await signJwt({ sub: 'u1' }, SECRET);
+        expect(await verifyJwt(noExp, SECRET, { requireExp: false })).toEqual({
+            sub: 'u1'
+        });
+        // Expired tokens stay expired even when exp is optional.
+        const expired = await signJwt({ sub: 'u1', exp: now() - 120 }, SECRET);
+        expect(
+            await verifyJwt(expired, SECRET, { requireExp: false })
+        ).toBeNull();
     });
 
     it('rejects non-HS256 headers (alg=none attack)', async () => {

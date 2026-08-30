@@ -20,7 +20,7 @@
  * @property {string} path
  * @property {(c: RouteContext) => Promise<Response> | Response} handler
  * @property {'public' | 'member' | 'staff'} access
- * @property {{ name: string, limit: number, windowSec: number, by: 'user' | 'ip' } | null} [limit]
+ * @property {Array<{ name: string, limit: number, windowSec: number, by: 'user' | 'ip' }>} [limits]
  */
 
 /**

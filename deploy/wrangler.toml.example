@@ -44,7 +44,11 @@ crons = ["0 3 * * *"]
 PUBLIC_URL = "https://feedback.example.com"
 # Comma-separated origins allowed to call the API from a browser (your app
 # that hosts the embed/hints). `*` is allowed once per entry as a
-# subdomain wildcard, e.g. https://*.pages.dev
+# subdomain wildcard — scope it to YOUR site's previews, e.g.
+# https://*--your-site.netlify.app. NEVER allow a bare shared-hosting
+# suffix like https://*.netlify.app: anyone can deploy under it. Wildcard
+# matches are also weaker on purpose: they get CORS access WITHOUT
+# credentials, so session cookies only ever ride exact entries.
 ALLOWED_ORIGINS = "https://app.example.com"
 # 'true' to accept posts from visitors without a JWT/session.
 ALLOW_ANONYMOUS_POSTS = "false"

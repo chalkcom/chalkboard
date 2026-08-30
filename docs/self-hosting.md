@@ -67,7 +67,7 @@ imported votes and comments attached to them.
 | `RATE` | KV | fixed-window rate limits (fails open if absent) |
 | `ASSETS` | assets | board SPA + `sdk.js`, SPA fallback enabled |
 | `PUBLIC_URL` | var | canonical origin, SSO redirect allow-list |
-| `ALLOWED_ORIGINS` | var | comma list; `https://*.example.com` wildcards allowed |
+| `ALLOWED_ORIGINS` | var | comma list; scoped wildcards allowed (e.g. `https://*--your-site.netlify.app`) — wildcard matches get CORS **without credentials**, and cookie-authed writes require an exact entry; never allow a bare shared-hosting suffix |
 | `ALLOW_ANONYMOUS_POSTS` | var | `'true'` / `'false'` |
 | `FEEDBACK_JWT_SECRET` | secret | HS256 secret shared with your app |
 | `IMPORT_TOKEN` | secret | bearer token for `POST /api/v1/import` |

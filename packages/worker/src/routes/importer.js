@@ -11,12 +11,43 @@ import { json, errorResponse, readJson, nowIso } from '../lib/http.js';
 const MAX_POSTS = 100;
 
 /**
+ * Compare two secrets without leaking match position or length through
+ * timing: HMAC both with a fixed key, then compare the fixed-size digests
+ * byte-for-byte with a constant-time fold.
+ * @param {string} a
+ * @param {string} b
+ * @returns {Promise<boolean>}
+ */
+async function secretsEqual(a, b) {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode('chalkboard-import-token-compare'),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+    );
+    const [da, db] = await Promise.all([
+        crypto.subtle.sign('HMAC', key, encoder.encode(a)),
+        crypto.subtle.sign('HMAC', key, encoder.encode(b))
+    ]);
+    const va = new Uint8Array(da);
+    const vb = new Uint8Array(db);
+    let diff = 0;
+    for (let i = 0; i < va.length; i += 1) diff |= va[i] ^ vb[i];
+    return diff === 0;
+}
+
+/**
  * @param {import('../lib/router.js').RouteContext} c
  */
 export async function importPosts(c) {
     const header = c.request.headers.get('Authorization') || '';
     const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-    if (!c.env.IMPORT_TOKEN || token !== c.env.IMPORT_TOKEN) {
+    if (
+        !c.env.IMPORT_TOKEN ||
+        !(await secretsEqual(token, c.env.IMPORT_TOKEN))
+    ) {
         return errorResponse('invalid import token', 401);
     }
     const body = /** @type {any} */ (await readJson(c.request)) ?? {};

@@ -203,6 +203,49 @@ describe('CORS', () => {
         expect(denied.headers.get('Access-Control-Allow-Origin')).toBeNull();
     });
 
+    it('allows credentials for exact origins but never for wildcards', async () => {
+        const { call } = makeApp();
+        const exact = await call('/api/v1/config', {
+            headers: { Origin: 'https://app.example.com' }
+        });
+        expect(exact.headers.get('Access-Control-Allow-Credentials')).toBe(
+            'true'
+        );
+
+        const wildcard = await call('/api/v1/config', {
+            headers: { Origin: 'https://pr-42.preview.example.com' }
+        });
+        expect(wildcard.headers.get('Access-Control-Allow-Origin')).toBe(
+            'https://pr-42.preview.example.com'
+        );
+        expect(
+            wildcard.headers.get('Access-Control-Allow-Credentials')
+        ).toBeNull();
+    });
+
+    it('rejects cookie-authed mutations from wildcard-matched origins', async () => {
+        const { call } = makeApp();
+        const token = await memberJwt({ sub: 'sso-wc', email: 'wc@x.com' });
+        const sso = await call(`/auth/sso?jwt=${encodeURIComponent(token)}`);
+        const sessionValue = sso.headers
+            .get('Set-Cookie')
+            .split(';')[0]
+            .split('=')
+            .slice(1)
+            .join('=');
+        // The origin matches the https://*.preview.example.com wildcard —
+        // enough for CORS reads, never enough to ride the session cookie.
+        const res = await call('/api/v1/posts', {
+            method: 'POST',
+            headers: {
+                Cookie: `cb_session=${sessionValue}`,
+                Origin: 'https://pr-42.preview.example.com'
+            },
+            body: { title: 'Wildcard CSRF attempt' }
+        });
+        expect(res.status).toBe(403);
+    });
+
     it('answers preflight for allowed origins', async () => {
         const { call } = makeApp();
         const res = await call('/api/v1/posts', {

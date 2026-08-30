@@ -1,7 +1,12 @@
 /**
  * CORS handling. Origins are matched exactly against ALLOWED_ORIGINS; an
  * entry may use `*` only as a full-origin wildcard for one subdomain level
- * or more, e.g. `https://*.netlify.app`.
+ * or more, e.g. `https://*--your-site.netlify.app`.
+ *
+ * Credentials (cookies) are only ever allowed for EXACT entries: a wildcard
+ * match gets the origin echoed without `Access-Control-Allow-Credentials`,
+ * so a broad suffix like `https://*.netlify.app` cannot let arbitrary sites
+ * on shared hosting ride a visitor's session cookie.
  */
 
 /**
@@ -16,15 +21,18 @@ export function parseAllowedOrigins(allowedOrigins) {
 }
 
 /**
+ * How (if at all) an Origin matches the allow-list.
  * @param {string | null} origin the request's Origin header
  * @param {string[]} allowed entries from {@link parseAllowedOrigins}
- * @returns {boolean}
+ * @returns {'exact' | 'wildcard' | null}
  */
-export function originAllowed(origin, allowed) {
-    if (!origin) return false;
+export function matchOrigin(origin, allowed) {
+    if (!origin) return null;
+    /** @type {'exact' | 'wildcard' | null} */
+    let match = null;
     for (const entry of allowed) {
         if (!entry.includes('*')) {
-            if (entry === origin) return true;
+            if (entry === origin) return 'exact';
             continue;
         }
         const star = entry.indexOf('*');
@@ -35,26 +43,41 @@ export function originAllowed(origin, allowed) {
             origin.endsWith(suffix) &&
             origin.length > prefix.length + suffix.length
         ) {
-            return true;
+            match = 'wildcard';
         }
     }
-    return false;
+    return match;
+}
+
+/**
+ * @param {string | null} origin
+ * @param {string[]} allowed
+ * @returns {boolean} whether the origin matches at all (exact or wildcard)
+ */
+export function originAllowed(origin, allowed) {
+    return matchOrigin(origin, allowed) !== null;
 }
 
 /**
  * CORS response headers for an allowed origin (empty object otherwise).
+ * Wildcard matches deliberately omit Allow-Credentials — see file header.
  * @param {Request} request
  * @param {string[]} allowed
  * @returns {Record<string, string>}
  */
 export function corsHeaders(request, allowed) {
     const origin = request.headers.get('Origin');
-    if (!originAllowed(origin, allowed)) return {};
-    return {
+    const match = matchOrigin(origin, allowed);
+    if (!match) return {};
+    /** @type {Record<string, string>} */
+    const headers = {
         'Access-Control-Allow-Origin': /** @type {string} */ (origin),
-        'Access-Control-Allow-Credentials': 'true',
         Vary: 'Origin'
     };
+    if (match === 'exact') {
+        headers['Access-Control-Allow-Credentials'] = 'true';
+    }
+    return headers;
 }
 
 /**

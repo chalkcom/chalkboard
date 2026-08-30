@@ -16,6 +16,7 @@ export default [
                 Headers: 'readonly',
                 Request: 'readonly',
                 Response: 'readonly',
+                MessageEvent: 'readonly',
                 console: 'readonly',
                 URL: 'readonly',
                 URLSearchParams: 'readonly',
