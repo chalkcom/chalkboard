@@ -1,0 +1,56 @@
+# Automated first-pass review by Claude on every PR when it opens or
+# leaves draft. Re-request by commenting "@claude review" (claude.yml).
+#
+# Inert until the ANTHROPIC_API_KEY repo secret exists — the steps skip
+# cleanly without it. See claude.yml's header for the other activation
+# caveat (workflow must match the default branch).
+name: Claude Review
+
+on:
+    pull_request:
+        types: [opened, ready_for_review]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+    cancel-in-progress: true
+
+jobs:
+    review:
+        if: ${{ !github.event.pull_request.draft }}
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: write
+            issues: read
+            id-token: write
+            actions: read
+        steps:
+            - uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
+              with:
+                  egress-policy: audit
+
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+              with:
+                  fetch-depth: 1
+
+            - uses: anthropics/claude-code-action@a874e9ecd7bb36efdad65429c6b35815f5a08f10 # v1
+              if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+              with:
+                  anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+                  use_sticky_comment: true
+                  prompt: |
+                      Review this pull request as a Chalkboard maintainer.
+                      Read CLAUDE.md first and hold the diff to its hard
+                      rules. Prioritize, in order:
+                      1. Correctness bugs and missing/weakened tests.
+                      2. Security: JWT/session logic, CORS and allowed
+                         origins, rate limiting, XSS in markdown rendering,
+                         anything touching packages/core/src/jwt or
+                         packages/core/src/markdown.
+                      3. Hard-rule violations: new runtime dependencies,
+                         frameworks in packages/sdk, raised size budget,
+                         edited migrations, skipped tests.
+                      4. A missing changeset on user-facing changes.
+                      Keep the review short and concrete; point at lines.
+                      Do not restate the diff or praise the code.
