@@ -8,7 +8,8 @@ once, then use them anywhere in your markup.
 
 All visible copy comes from attributes, so you control wording and
 localisation completely — the elements render no default marketing text
-beyond a generic fallback label.
+beyond a generic fallback label. See all three elements live on your own
+deployment at `/sdk-test`.
 
 ## `<chalk-hint>` — capture a missing-feature moment
 

@@ -6,8 +6,20 @@
     "engines": {
         "node": ">=22"
     },
+    "scripts": {
+        "configure": "node scripts/configure.mjs",
+        "db:migrate": "wrangler d1 migrations apply feedback --local",
+        "db:seed": "wrangler d1 execute feedback --local --file=./seed.sql",
+        "dev": "pnpm run configure && pnpm run db:migrate && wrangler dev",
+        "quickstart": "pnpm run configure && pnpm run db:migrate && pnpm run db:seed && wrangler dev",
+        "format:check": "prettier --check ."
+    },
     "dependencies": {
         "@chalkcom/core": "workspace:*",
         "@chalkcom/worker": "workspace:*"
+    },
+    "devDependencies": {
+        "prettier": "^3.6.2",
+        "wrangler": "^4.42.2"
     }
 }

@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Chalkboard SDK test page</title>
+        <style>
+            :root {
+                --brand: #4f46e5;
+                --fg: #0f172a;
+                --muted: #64748b;
+                --line: #e2e8f0;
+                --bg: #f8fafc;
+                --card: #ffffff;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                background: var(--bg);
+                color: var(--fg);
+                font:
+                    15px/1.5 system-ui,
+                    -apple-system,
+                    'Segoe UI',
+                    sans-serif;
+            }
+            header {
+                background: var(--card);
+                border-bottom: 1px solid var(--line);
+                padding: 20px;
+            }
+            .shell {
+                max-width: 960px;
+                margin: 0 auto;
+                padding: 0 20px;
+            }
+            header .shell {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: baseline;
+                gap: 8px 16px;
+                padding: 0;
+            }
+            h1 {
+                font-size: 20px;
+                margin: 0;
+            }
+            h2 {
+                font-size: 16px;
+                margin: 0 0 4px;
+            }
+            header nav {
+                margin-left: auto;
+                display: flex;
+                gap: 12px;
+                font-size: 14px;
+            }
+            a {
+                color: var(--brand);
+            }
+            main {
+                display: grid;
+                gap: 20px;
+                padding: 20px 0 60px;
+            }
+            section {
+                background: var(--card);
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                padding: 18px 20px;
+            }
+            section > p {
+                color: var(--muted);
+                font-size: 14px;
+                margin: 0 0 14px;
+            }
+            .demo {
+                display: grid;
+                gap: 8px;
+                padding: 14px 0;
+                border-top: 1px solid var(--line);
+            }
+            .demo-label {
+                font-size: 13px;
+                font-weight: 600;
+                color: var(--muted);
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+            }
+            pre {
+                margin: 0;
+                padding: 10px 12px;
+                background: #f1f5f9;
+                border-radius: 8px;
+                font-size: 12.5px;
+                line-height: 1.45;
+                overflow-x: auto;
+            }
+            button.ui {
+                font: inherit;
+                font-size: 14px;
+                padding: 6px 14px;
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                background: var(--card);
+                cursor: pointer;
+            }
+            button.ui:hover {
+                border-color: var(--brand);
+                color: var(--brand);
+            }
+            .row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                align-items: center;
+            }
+            .pill {
+                display: inline-block;
+                padding: 2px 10px;
+                border-radius: 999px;
+                font-size: 13px;
+                background: #eef2ff;
+                color: var(--brand);
+            }
+            .pill.warn {
+                background: #fef3c7;
+                color: #92400e;
+            }
+            .note {
+                font-size: 13px;
+                color: var(--muted);
+            }
+            input[type='text'] {
+                font: inherit;
+                font-size: 13px;
+                padding: 6px 10px;
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                min-width: 260px;
+                flex: 1;
+            }
+            .themed-zone {
+                --chalk-brand: #0d9488;
+                --chalk-radius: 999px;
+                --chalk-muted: #99f6e4;
+                border: 1px dashed #5eead4;
+                background: #f0fdfa;
+                border-radius: 10px;
+                padding: 14px;
+                display: grid;
+                gap: 10px;
+            }
+            #embed-target {
+                border: 1px dashed var(--line);
+                border-radius: 8px;
+                min-height: 120px;
+            }
+            #embed-target:empty::before {
+                content: 'Embed not mounted — pick a page above.';
+                display: block;
+                padding: 40px 0;
+                text-align: center;
+                color: var(--muted);
+                font-size: 14px;
+            }
+            #event-log {
+                max-height: 260px;
+                overflow-y: auto;
+            }
+            #event-log div {
+                display: flex;
+                gap: 10px;
+            }
+            #event-log .t {
+                color: var(--muted);
+            }
+            #event-log .dom {
+                color: #0d9488;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <div class="shell">
+                <h1>Chalkboard SDK test page</h1>
+                <span class="pill" id="identity-pill">Anonymous</span>
+                <nav>
+                    <a href="/">Board</a>
+                    <a href="/roadmap">Roadmap</a>
+                    <a href="/staff">Staff</a>
+                    <a href="/sdk.js">sdk.js</a>
+                </nav>
+            </div>
+        </header>
+
+        <main class="shell">
+            <section id="identity">
+                <h2>Identity</h2>
+                <p>
+                    The SDK forwards a host-signed JWT with every API call. In
+                    production your server mints it (see
+                    <code>docs/embedding.md</code>) — signing in the browser,
+                    like this page does, is for
+                    <strong>local development only</strong>. The default secret
+                    matches <code>deploy/.dev.vars.example</code>, so on
+                    <code>wrangler dev</code> it just works.
+                </p>
+                <div class="row">
+                    <button class="ui" id="signin-demo">
+                        Sign in as demo member
+                    </button>
+                    <button class="ui" id="signin-tessa">
+                        Sign in as Tessa (seeded voter)
+                    </button>
+                    <button class="ui" id="signout">Sign out</button>
+                    <span class="note" id="identity-note"></span>
+                </div>
+                <details style="margin-top: 10px">
+                    <summary class="note">
+                        Dev secret &amp; paste-a-JWT (advanced)
+                    </summary>
+                    <div class="row" style="margin-top: 8px">
+                        <input
+                            type="text"
+                            id="dev-secret"
+                            value="chalkboard-dev-secret-not-for-production"
+                            aria-label="Dev JWT secret"
+                        />
+                        <span class="note">
+                            HS256 secret used by the sign-in buttons
+                        </span>
+                    </div>
+                    <div class="row" style="margin-top: 8px">
+                        <input
+                            type="text"
+                            id="jwt-input"
+                            placeholder="…or paste a server-minted JWT"
+                            aria-label="JWT"
+                        />
+                        <button class="ui" id="use-jwt">Use JWT</button>
+                    </div>
+                </details>
+            </section>
+
+            <section id="hints">
+                <h2>Hint elements</h2>
+                <p>
+                    Inline custom elements shipped in <code>/sdk.js</code> —
+                    drop them where users hit a gap. Docs:
+                    <code>docs/hints.md</code>.
+                </p>
+
+                <div class="demo">
+                    <div class="demo-label">
+                        &lt;chalk-hint&gt; — link · button · card
+                    </div>
+                    <div class="row">
+                        <chalk-hint
+                            label="Missing a report? Tell us"
+                            topic="reports"
+                        ></chalk-hint>
+                        <chalk-hint
+                            variant="button"
+                            label="Suggest an improvement"
+                            topic="menu"
+                        ></chalk-hint>
+                    </div>
+                    <chalk-hint
+                        variant="card"
+                        label="Can't find an integration?"
+                        description="Tell us which tools you want connected."
+                        topic="integrations"
+                        prefill-title="Integrate with "
+                    ></chalk-hint>
+                    <pre><code>&lt;chalk-hint label="Missing a report? Tell us" topic="reports"&gt;&lt;/chalk-hint&gt;
+&lt;chalk-hint variant="button" label="Suggest an improvement" topic="menu"&gt;&lt;/chalk-hint&gt;
+&lt;chalk-hint variant="card" label="Can't find an integration?"
+            description="Tell us which tools you want connected."
+            topic="integrations" prefill-title="Integrate with "&gt;&lt;/chalk-hint&gt;</code></pre>
+                </div>
+
+                <div class="demo">
+                    <div class="demo-label">
+                        &lt;chalk-topic&gt; — live count, opens the board
+                        filtered
+                    </div>
+                    <div class="row">
+                        <chalk-topic
+                            topic="menu"
+                            label="open ideas for the menu"
+                            cta-label="vote or add yours"
+                        ></chalk-topic>
+                    </div>
+                    <div class="row">
+                        <chalk-topic
+                            topic="reports"
+                            status="open,planned,in_progress,under_review"
+                            label="active ideas for reports"
+                            cta-label="have your say"
+                        ></chalk-topic>
+                    </div>
+                    <pre><code>&lt;chalk-topic topic="menu" label="open ideas for the menu" cta-label="vote or add yours"&gt;&lt;/chalk-topic&gt;
+&lt;chalk-topic topic="reports" status="open,planned,in_progress,under_review"
+             label="active ideas for reports" cta-label="have your say"&gt;&lt;/chalk-topic&gt;</code></pre>
+                    <span class="note">
+                        Counts come from <code>GET /api/v1/posts/count</code>
+                        and cache in sessionStorage for 5 minutes.
+                    </span>
+                </div>
+
+                <div class="demo">
+                    <div class="demo-label">
+                        &lt;chalk-post&gt; — vote card for one idea
+                    </div>
+                    <div class="row" id="post-cards">
+                        <chalk-post
+                            post="bulk-edit-menu-items"
+                            cta-label="Vote for this"
+                            voted-label="You're on the list ✓"
+                        ></chalk-post>
+                    </div>
+                    <pre><code>&lt;chalk-post post="bulk-edit-menu-items" cta-label="Vote for this"
+            voted-label="You're on the list ✓"&gt;&lt;/chalk-post&gt;</code></pre>
+                    <span class="note">
+                        With a JWT it votes in place (Tessa has already voted —
+                        sign in as her to see the voted state). Anonymous
+                        visitors get the post overlay instead.
+                    </span>
+                </div>
+            </section>
+
+            <section id="overlay">
+                <h2>Overlay</h2>
+                <p>
+                    <code>Chalkboard('open', …)</code> slides the board in from
+                    the right. ESC, the backdrop, or the board's close button
+                    dismiss it.
+                </p>
+                <div class="demo">
+                    <div class="row">
+                        <button class="ui" id="open-submit">
+                            Submit form (prefilled)
+                        </button>
+                        <button class="ui" id="open-board">
+                            Board, topic "menu"
+                        </button>
+                        <button class="ui" id="open-post">One post</button>
+                    </div>
+                    <pre><code>Chalkboard('open', { page: 'submit', topic: 'reports', prefillTitle: 'CSV export of ' });
+Chalkboard('open', { page: 'board', topic: 'menu' });
+Chalkboard('open', { page: 'post', postId: 'bulk-edit-menu-items' });</code></pre>
+                </div>
+            </section>
+
+            <section id="embed">
+                <h2>Inline embed</h2>
+                <p>
+                    <code>Chalkboard('embed', …)</code> mounts the board
+                    chrome-less in an auto-resizing iframe.
+                </p>
+                <div class="demo">
+                    <div class="row">
+                        <button class="ui" id="mount-board">Mount Board</button>
+                        <button class="ui" id="mount-roadmap">
+                            Mount Roadmap
+                        </button>
+                        <button class="ui" id="nav-roadmap">
+                            navigate('/roadmap')
+                        </button>
+                        <button class="ui" id="nav-home">navigate('/')</button>
+                        <button class="ui" id="unmount">unmount</button>
+                    </div>
+                    <pre><code>Chalkboard('embed', {
+    url: window.location.origin,
+    container: '#embed-target', // or omit: [data-feedback-embed]
+    initialPage: 'Board' // 'Board' | 'Roadmap'
+});</code></pre>
+                    <div id="embed-target" data-feedback-embed></div>
+                </div>
+            </section>
+
+            <section id="theming">
+                <h2>Theming</h2>
+                <p>
+                    Hint elements read inheritable
+                    <code>--chalk-*</code> custom properties through their
+                    shadow roots — scope them to a container to re-theme a
+                    surface.
+                </p>
+                <div class="demo">
+                    <div class="row">
+                        <label class="note" for="brand-color">
+                            --chalk-brand
+                        </label>
+                        <input type="color" id="brand-color" value="#0d9488" />
+                    </div>
+                    <div class="themed-zone" id="themed-zone">
+                        <chalk-hint
+                            variant="button"
+                            label="Request a report"
+                            topic="reports"
+                        ></chalk-hint>
+                        <chalk-hint
+                            label="Something missing here?"
+                            topic="reports"
+                        ></chalk-hint>
+                    </div>
+                    <pre><code>.themed-zone {
+    --chalk-brand: #0d9488;
+    --chalk-radius: 999px;
+}</code></pre>
+                </div>
+            </section>
+
+            <section id="events">
+                <h2>Events</h2>
+                <p>
+                    Every interaction calls the <code>onEvent</code> callback
+                    and batches to <code>POST /api/v1/events</code> (flushed
+                    every 5&nbsp;s — watch the network tab; staff see the funnel
+                    on <a href="/staff">/staff</a>). Successful actions also
+                    dispatch <code>chalk:submitted</code> /
+                    <code>chalk:voted</code> DOM events on <code>window</code>.
+                </p>
+                <div class="demo">
+                    <pre
+                        id="event-log"
+                    ><div class="t" id="event-log-empty">— waiting for the first event (impressions fire as hints scroll into view)</div></pre>
+                </div>
+            </section>
+        </main>
+
+        <script>
+            // Event log plumbing, defined before the SDK config so the
+            // onEvent callback can use it from the very first event.
+            window.__logEvent = function (kind, name, payload) {
+                var log = document.getElementById('event-log');
+                var empty = document.getElementById('event-log-empty');
+                if (empty) empty.remove();
+                var line = document.createElement('div');
+                var time = document.createElement('span');
+                time.className = 't';
+                time.textContent = new Date().toLocaleTimeString();
+                var body = document.createElement('span');
+                if (kind === 'dom') body.className = 'dom';
+                body.textContent =
+                    (kind === 'dom' ? '[DOM] ' : '') +
+                    name +
+                    ' ' +
+                    JSON.stringify(payload || {});
+                line.appendChild(time);
+                line.appendChild(body);
+                log.prepend(line);
+                while (log.childElementCount > 200) {
+                    log.lastElementChild.remove();
+                }
+            };
+            window.addEventListener('chalk:submitted', function (e) {
+                window.__logEvent('dom', 'chalk:submitted', e.detail);
+            });
+            window.addEventListener('chalk:voted', function (e) {
+                window.__logEvent('dom', 'chalk:voted', e.detail);
+            });
+
+            // Pre-load stub: queues calls made before /sdk.js arrives.
+            window.Chalkboard =
+                window.Chalkboard ||
+                function () {
+                    (window.Chalkboard.q = window.Chalkboard.q || []).push(
+                        arguments
+                    );
+                };
+            Chalkboard('config', {
+                url: window.location.origin,
+                onEvent: function (name, payload) {
+                    window.__logEvent('sdk', name, payload);
+                }
+            });
+        </script>
+        <script src="/sdk.js" defer></script>
+
+        <script>
+            (function () {
+                'use strict';
+
+                var $ = function (id) {
+                    return document.getElementById(id);
+                };
+
+                /* ---------- identity: dev-only in-browser JWT ---------- */
+
+                function base64url(bytes) {
+                    var binary = '';
+                    bytes.forEach(function (b) {
+                        binary += String.fromCharCode(b);
+                    });
+                    return btoa(binary)
+                        .replaceAll('+', '-')
+                        .replaceAll('/', '_')
+                        .replace(/=+$/, '');
+                }
+
+                // LOCAL DEV ONLY. Never sign JWTs in the browser in
+                // production — mint them server-side (docs/embedding.md).
+                async function mintDevJwt(claims, secret) {
+                    var enc = new TextEncoder();
+                    var input =
+                        base64url(
+                            enc.encode(
+                                JSON.stringify({ alg: 'HS256', typ: 'JWT' })
+                            )
+                        ) +
+                        '.' +
+                        base64url(enc.encode(JSON.stringify(claims)));
+                    var key = await crypto.subtle.importKey(
+                        'raw',
+                        enc.encode(secret),
+                        { name: 'HMAC', hash: 'SHA-256' },
+                        false,
+                        ['sign']
+                    );
+                    var sig = await crypto.subtle.sign(
+                        'HMAC',
+                        key,
+                        enc.encode(input)
+                    );
+                    return input + '.' + base64url(new Uint8Array(sig));
+                }
+
+                // chalk-post caches its voted state; replace the elements so
+                // they re-fetch with the new identity.
+                function refreshPostCards() {
+                    document
+                        .querySelectorAll('chalk-post')
+                        .forEach(function (el) {
+                            el.replaceWith(el.cloneNode(true));
+                        });
+                }
+
+                async function setIdentity(jwt, label) {
+                    Chalkboard('config', { jwt: jwt });
+                    var pill = $('identity-pill');
+                    var note = $('identity-note');
+                    if (!jwt) {
+                        pill.textContent = 'Anonymous';
+                        pill.className = 'pill';
+                        note.textContent = '';
+                        refreshPostCards();
+                        return;
+                    }
+                    pill.textContent = label + ' — checking…';
+                    try {
+                        var res = await fetch('/api/v1/users/me', {
+                            headers: { Authorization: 'Bearer ' + jwt }
+                        });
+                        if (!res.ok) throw new Error(String(res.status));
+                        var me = (await res.json()).user;
+                        pill.textContent =
+                            (me.name || me.email || me.id) +
+                            (me.isStaff ? ' (staff)' : '');
+                        pill.className = 'pill';
+                        note.textContent = 'API accepted the JWT.';
+                    } catch (err) {
+                        pill.textContent = label + ' — JWT rejected';
+                        pill.className = 'pill warn';
+                        note.textContent =
+                            'The API rejected the JWT (' +
+                            err.message +
+                            ') — does the secret match FEEDBACK_JWT_SECRET?';
+                    }
+                    refreshPostCards();
+                }
+
+                async function signInAs(claims, label) {
+                    var secret = $('dev-secret').value;
+                    var jwt = await mintDevJwt(
+                        Object.assign(
+                            { exp: Math.floor(Date.now() / 1000) + 7200 },
+                            claims
+                        ),
+                        secret
+                    );
+                    await setIdentity(jwt, label);
+                }
+
+                $('signin-demo').addEventListener('click', function () {
+                    signInAs(
+                        {
+                            sub: 'sdk-test-demo',
+                            name: 'SDK Test User',
+                            email: 'sdk-test@demo.example'
+                        },
+                        'Demo member'
+                    );
+                });
+                $('signin-tessa').addEventListener('click', function () {
+                    signInAs(
+                        {
+                            sub: 'seed-tessa',
+                            name: 'Tessa M.',
+                            email: 'tessa@demo.example'
+                        },
+                        'Tessa M.'
+                    );
+                });
+                $('signout').addEventListener('click', function () {
+                    setIdentity(null);
+                });
+                $('use-jwt').addEventListener('click', function () {
+                    var jwt = $('jwt-input').value.trim();
+                    if (jwt) setIdentity(jwt, 'Pasted JWT');
+                });
+
+                /* ---------------------- overlay ----------------------- */
+
+                $('open-submit').addEventListener('click', function () {
+                    Chalkboard('open', {
+                        page: 'submit',
+                        topic: 'reports',
+                        prefillTitle: 'CSV export of '
+                    });
+                });
+                $('open-board').addEventListener('click', function () {
+                    Chalkboard('open', { page: 'board', topic: 'menu' });
+                });
+                $('open-post').addEventListener('click', function () {
+                    Chalkboard('open', {
+                        page: 'post',
+                        postId: 'bulk-edit-menu-items'
+                    });
+                });
+
+                /* ------------------- inline embed --------------------- */
+
+                function mountEmbed(initialPage) {
+                    // Only pass the keys you mean to set: embed options
+                    // double as global config, so `jwt: undefined` would
+                    // sign the SDK out.
+                    Chalkboard('embed', {
+                        url: window.location.origin,
+                        container: '#embed-target',
+                        initialPage: initialPage
+                    });
+                }
+                $('mount-board').addEventListener('click', function () {
+                    mountEmbed('Board');
+                });
+                $('mount-roadmap').addEventListener('click', function () {
+                    mountEmbed('Roadmap');
+                });
+                $('nav-roadmap').addEventListener('click', function () {
+                    Chalkboard('navigate', '/roadmap');
+                });
+                $('nav-home').addEventListener('click', function () {
+                    Chalkboard('navigate', '/');
+                });
+                $('unmount').addEventListener('click', function () {
+                    Chalkboard('unmount');
+                });
+
+                /* --------------------- theming ------------------------ */
+
+                $('brand-color').addEventListener('input', function (e) {
+                    $('themed-zone').style.setProperty(
+                        '--chalk-brand',
+                        e.target.value
+                    );
+                });
+            })();
+        </script>
+    </body>
+</html>

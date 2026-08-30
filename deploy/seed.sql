@@ -1,15 +1,17 @@
 -- Demo data for a fresh Chalkboard install. Apply after migrations:
 --   wrangler d1 execute feedback --remote --file=./seed.sql
--- (Safe to skip in production; it only makes the board look lived-in.)
+-- or locally via `pnpm db:seed`. Idempotent (INSERT OR IGNORE), so
+-- re-running is safe. (Skip in production; it only makes the board look
+-- lived-in.)
 
-INSERT INTO users (id, external_id, email, name, role, source, created_at) VALUES
+INSERT OR IGNORE INTO users (id, external_id, email, name, role, source, created_at) VALUES
   ('seeduser00000001', 'seed-tessa',  'tessa@demo.example',  'Tessa M.',  'member', 'sso', '2026-05-04T09:12:00.000Z'),
   ('seeduser00000002', 'seed-arun',   'arun@demo.example',   'Arun P.',   'member', 'sso', '2026-05-11T14:03:00.000Z'),
   ('seeduser00000003', 'seed-lena',   'lena@demo.example',   'Lena K.',   'member', 'sso', '2026-05-20T18:44:00.000Z'),
   ('seeduser00000004', 'seed-marco',  'marco@demo.example',  'Marco R.',  'member', 'sso', '2026-06-02T08:20:00.000Z'),
   ('seeduser00000005', 'seed-staff',  'team@demo.example',   'The Team',  'staff',  'sso', '2026-05-01T00:00:00.000Z');
 
-INSERT INTO posts (id, board_id, title, body, status, slug, author_id, vote_count, vote_offset, comment_count, source, topic, created_at, updated_at, status_changed_at) VALUES
+INSERT OR IGNORE INTO posts (id, board_id, title, body, status, slug, author_id, vote_count, vote_offset, comment_count, source, topic, created_at, updated_at, status_changed_at) VALUES
   ('seedpost00000001', 'b0000000feature0', 'Export orders as CSV',
    'We reconcile in a spreadsheet every Monday. A one-click **CSV export** of the order list (with the current filters applied) would save us an hour a week.',
    'in_progress', 'export-orders-as-csv', 'seeduser00000001', 4, 0, 2, 'board', 'reports', '2026-05-04T09:15:00.000Z', '2026-06-20T10:00:00.000Z', '2026-06-20T10:00:00.000Z'),
@@ -35,7 +37,7 @@ INSERT INTO posts (id, board_id, title, body, status, slug, author_id, vote_coun
    'Environmental health asked for an allergen table per menu. Generating it from item data would be a lifesaver.',
    'closed', 'printable-allergen-matrix', 'seeduser00000004', 1, 0, 1, 'board', 'menu', '2026-06-20T09:05:00.000Z', '2026-07-02T09:00:00.000Z', '2026-07-02T09:00:00.000Z');
 
-INSERT INTO votes (post_id, user_id, created_at) VALUES
+INSERT OR IGNORE INTO votes (post_id, user_id, created_at) VALUES
   ('seedpost00000001', 'seeduser00000001', '2026-05-04T09:15:01.000Z'),
   ('seedpost00000001', 'seeduser00000002', '2026-05-05T10:00:00.000Z'),
   ('seedpost00000001', 'seeduser00000003', '2026-05-06T11:00:00.000Z'),
@@ -56,7 +58,7 @@ INSERT INTO votes (post_id, user_id, created_at) VALUES
   ('seedpost00000007', 'seeduser00000003', '2026-07-01T10:20:01.000Z'),
   ('seedpost00000008', 'seeduser00000004', '2026-06-20T09:05:01.000Z');
 
-INSERT INTO comments (id, post_id, parent_id, author_id, body, is_team, created_at, updated_at) VALUES
+INSERT OR IGNORE INTO comments (id, post_id, parent_id, author_id, body, is_team, created_at, updated_at) VALUES
   ('seedcmnt00000001', 'seedpost00000001', NULL, 'seeduser00000005',
    'Started on this — first cut exports the filtered list with totals. Anything else you need in the file?', 1,
    '2026-06-20T10:05:00.000Z', '2026-06-20T10:05:00.000Z'),
@@ -76,12 +78,12 @@ INSERT INTO comments (id, post_id, parent_id, author_id, body, is_team, created_
    'Closing in favour of the compliance pack we announced — allergen matrix is included there.', 1,
    '2026-07-02T09:01:00.000Z', '2026-07-02T09:01:00.000Z');
 
-INSERT INTO tags (id, name, color, is_private, created_at) VALUES
+INSERT OR IGNORE INTO tags (id, name, color, is_private, created_at) VALUES
   ('seedtag000000001', 'quick win', '#10b981', 0, '2026-05-01T00:00:00.000Z'),
   ('seedtag000000002', 'needs design', '#f59e0b', 0, '2026-05-01T00:00:00.000Z'),
   ('seedtag000000003', 'churn risk', '#ef4444', 1, '2026-05-01T00:00:00.000Z');
 
-INSERT INTO post_tags (post_id, tag_id) VALUES
+INSERT OR IGNORE INTO post_tags (post_id, tag_id) VALUES
   ('seedpost00000001', 'seedtag000000001'),
   ('seedpost00000002', 'seedtag000000002'),
   ('seedpost00000003', 'seedtag000000002'),

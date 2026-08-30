@@ -1,0 +1,13 @@
+# Local-development secrets and overrides for `wrangler dev`, copied to
+# .dev.vars (gitignored) by `pnpm configure`. wrangler only reads .dev.vars
+# for local dev — deployed workers get secrets from `wrangler secret put`
+# and config from the [vars] in wrangler.toml. Nothing in this file is a
+# real secret; replace nothing here for production.
+
+FEEDBACK_JWT_SECRET=chalkboard-dev-secret-not-for-production
+IMPORT_TOKEN=chalkboard-dev-import-token
+
+# Local overrides of the production-oriented [vars] in wrangler.toml.
+PUBLIC_URL=http://localhost:8787
+ALLOWED_ORIGINS=http://localhost:5173
+ALLOW_ANONYMOUS_POSTS=true
