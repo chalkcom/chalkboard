@@ -65,7 +65,7 @@ imported votes and comments attached to them.
 | --- | --- | --- |
 | `DB` | D1 | all data; migrations in `packages/worker/migrations` |
 | `RATE` | KV | fixed-window rate limits (fails open if absent) |
-| `ASSETS` | assets | board SPA + `sdk.js`, SPA fallback enabled |
+| `ASSETS` | assets | board SPA + `sdk.js`, SPA fallback enabled. The `[assets]` block **must** keep `run_worker_first = ["/api/*", "/auth/*"]`: assets-first serving answers top-level browser navigations with the SPA fallback before the worker runs, so without it `GET /auth/sso` returns index.html — no session cookie, and the SSO JWT stays in browser history |
 | `PUBLIC_URL` | var | canonical origin, SSO redirect allow-list |
 | `ALLOWED_ORIGINS` | var | comma list; scoped wildcards allowed (e.g. `https://*--your-site.netlify.app`) — wildcard matches get CORS **without credentials**, and cookie-authed writes require an exact entry; never allow a bare shared-hosting suffix |
 | `ALLOW_ANONYMOUS_POSTS` | var | `'true'` / `'false'` |

@@ -28,6 +28,7 @@ self-hosted story: your key, your billing, your data agreement.
 | `ANTHROPIC_API_KEY` | secret | `wrangler secret put ANTHROPIC_API_KEY`. Absent ⇒ feature entirely off: assist routes return 503 and `GET /api/v1/config` reports `assist: {enabled: false}` so UIs hide it. |
 | `ASSIST_ENABLED` | var | set to `'false'` to switch assist off without removing the key. |
 | `ASSIST_MODEL` | var | model ID; default `claude-opus-5`. |
+| `ASSIST_API_URL` | var | endpoint override (Cloudflare AI Gateway, corporate proxies, a local stub). Default: `https://api.anthropic.com/v1/messages`. The `x-api-key` header is sent either way. |
 | config row `assist.model` | D1 | overrides `ASSIST_MODEL` at runtime (`PUT /api/v1/config` as staff with `{"assist.model": "claude-sonnet-5"}`). |
 | `createFeedbackApp({assist: {model}})` | code | wins over both. |
 

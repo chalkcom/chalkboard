@@ -18,6 +18,14 @@ compatibility_date = "2026-08-01"
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+# REQUIRED — do not remove. With assets-first serving, a top-level browser
+# navigation (Sec-Fetch-Mode: navigate) is answered by the SPA fallback
+# BEFORE the worker runs. Without this list, GET /auth/sso?jwt=… returns
+# index.html instead of the worker's 302: no session cookie is ever set
+# and the SSO JWT leaks into browser history. Any API call made as a
+# navigation breaks the same way. These prefixes must always hit the
+# worker first.
+run_worker_first = ["/api/*", "/auth/*"]
 
 # D1 database. Create it with:
 #   wrangler d1 create feedback
@@ -59,6 +67,9 @@ ALLOW_ANONYMOUS_POSTS = "false"
 # ASSIST_MODEL = "claude-opus-5"
 # Set to 'false' to switch assist off without removing the key.
 # ASSIST_ENABLED = "true"
+# Endpoint override for Cloudflare AI Gateway, proxies, or a local stub;
+# defaults to the public Anthropic API. The API key header is sent either way.
+# ASSIST_API_URL = "https://gateway.ai.cloudflare.com/v1/<account>/<gw>/anthropic/v1/messages"
 
 # Secrets — set these with wrangler, never in this file:
 #   wrangler secret put FEEDBACK_JWT_SECRET   # shared HS256 secret with your app

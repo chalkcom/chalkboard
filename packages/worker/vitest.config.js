@@ -13,6 +13,13 @@ const migrations = readdirSync(migrationsDir)
         sql: readFileSync(join(migrationsDir, file), 'utf8')
     }));
 
+// The example deploy config is asserted against in test/deploy-config
+// (run_worker_first is required for SSO to work in real browsers).
+const wranglerExample = readFileSync(
+    join(import.meta.dirname, '..', '..', 'deploy', 'wrangler.toml.example'),
+    'utf8'
+);
+
 export default defineWorkersConfig({
     test: {
         include: ['test/**/*.spec.js'],
@@ -25,6 +32,7 @@ export default defineWorkersConfig({
                     kvNamespaces: ['RATE'],
                     bindings: {
                         TEST_MIGRATIONS: migrations,
+                        TEST_WRANGLER_EXAMPLE: wranglerExample,
                         PUBLIC_URL: 'https://feedback.example.com',
                         ALLOWED_ORIGINS:
                             'https://app.example.com,https://*.preview.example.com',

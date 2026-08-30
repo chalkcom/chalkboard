@@ -162,9 +162,13 @@ export async function callAssist({ env, model, schema, payload, transport }) {
         }
     });
 
+    // Endpoint override for AI Gateway / proxies / local stubs; the same
+    // key header is sent either way.
+    const url = env.ASSIST_API_URL || ANTHROPIC_URL;
+
     /** @param {boolean} withFormat */
     const attempt = withFormat =>
-        transport(ANTHROPIC_URL, {
+        transport(url, {
             method: 'POST',
             headers: {
                 'x-api-key': env.ANTHROPIC_API_KEY,

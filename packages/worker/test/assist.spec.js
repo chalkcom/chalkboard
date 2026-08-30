@@ -207,6 +207,25 @@ describe('POST /api/v1/assist/interview', () => {
         expect(retryBody.output_config.format).toBeUndefined();
     });
 
+    it('sends requests to ASSIST_API_URL when configured', async () => {
+        const transport = transportReturning({ questions: [] });
+        const gateway =
+            'https://gateway.ai.cloudflare.com/v1/acct/gw/anthropic/v1/messages';
+        const { call } = makeApp(
+            { assist: { transport } },
+            { ...ASSIST_ENV, ASSIST_API_URL: gateway }
+        );
+        await call('/api/v1/assist/interview', {
+            method: 'POST',
+            jwt: await memberJwt(),
+            body: { title: 'Via the gateway' }
+        });
+        const [url, init] = transport.mock.calls[0];
+        expect(url).toBe(gateway);
+        // The key header is sent to the override endpoint too.
+        expect(init.headers['x-api-key']).toBe('test-anthropic-key');
+    });
+
     it('honours the model precedence chain', async () => {
         const transport = transportReturning({ questions: [] });
         // Option beats env var.
