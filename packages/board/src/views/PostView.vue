@@ -1,17 +1,23 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { api } from '../api.js';
+import { api, session } from '../api.js';
 import { embedState, toEmbedPath } from '../embed/embed.js';
+import { useConfig } from '../composables/useConfig.js';
+import { statusLabel } from '../status.js';
 import StatusPill from '../components/StatusPill.vue';
 import VoteButton from '../components/VoteButton.vue';
 import CommentThread from '../components/CommentThread.vue';
 
 const route = useRoute();
 const router = useRouter();
+const config = useConfig();
 const post = ref(null);
 const comments = ref([]);
 const missing = ref(false);
+const statusError = ref('');
+
+const isStaff = computed(() => session.user?.isStaff === true);
 
 async function load() {
     missing.value = false;
@@ -37,6 +43,25 @@ async function loadComments() {
     post.value = fresh.post;
 }
 
+/** @param {Event} event */
+async function changeStatus(event) {
+    const next = /** @type {HTMLSelectElement} */ (event.target).value;
+    const previous = post.value.status;
+    if (next === previous) return;
+    statusError.value = '';
+    post.value.status = next;
+    try {
+        const res = await api(`/api/v1/posts/${post.value.id}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: next })
+        });
+        post.value.status = res.post.status;
+    } catch {
+        post.value.status = previous;
+        statusError.value = 'Could not update the status — try again.';
+    }
+}
+
 onMounted(load);
 watch(() => route.params.slug, load);
 </script>
@@ -53,7 +78,30 @@ watch(() => route.params.slug, load);
             <div class="min-w-0">
                 <h1 class="text-xl font-semibold">{{ post.title }}</h1>
                 <div class="mt-1 flex items-center gap-2 text-xs text-muted">
-                    <StatusPill :status="post.status" />
+                    <select
+                        v-if="isStaff"
+                        data-status-select
+                        :value="post.status"
+                        aria-label="Change status"
+                        class="rounded-full border border-edge bg-surface-raised px-2 py-0.5 text-xs font-medium"
+                        @change="changeStatus"
+                    >
+                        <option
+                            v-for="s in config.statuses"
+                            :key="s"
+                            :value="s"
+                        >
+                            {{ statusLabel(s) }}
+                        </option>
+                    </select>
+                    <StatusPill v-else :status="post.status" />
+                    <span
+                        v-if="statusError"
+                        data-status-error
+                        class="text-xs text-red-600"
+                    >
+                        {{ statusError }}
+                    </span>
                     <span v-if="post.authorName">{{ post.authorName }}</span>
                     <span>{{
                         new Date(post.createdAt).toLocaleDateString()

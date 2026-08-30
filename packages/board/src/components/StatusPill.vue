@@ -1,18 +1,10 @@
 <script setup>
 import { computed } from 'vue';
+import { statusLabel } from '../status.js';
 
 const props = defineProps({
     status: { type: String, required: true }
 });
-
-const LABELS = {
-    open: 'Open',
-    under_review: 'Under review',
-    planned: 'Planned',
-    in_progress: 'In progress',
-    complete: 'Complete',
-    closed: 'Closed'
-};
 
 const CLASSES = {
     open: 'bg-slate-100 text-slate-700',
@@ -23,7 +15,7 @@ const CLASSES = {
     closed: 'bg-slate-200 text-slate-600'
 };
 
-const label = computed(() => LABELS[props.status] ?? props.status);
+const label = computed(() => statusLabel(props.status));
 const klass = computed(() => CLASSES[props.status] ?? CLASSES.open);
 </script>
 
