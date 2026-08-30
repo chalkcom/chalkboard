@@ -2,6 +2,7 @@
 
 import { STATUSES } from '@chalkcom/core/protocol';
 import { json, errorResponse, readJson } from '../lib/http.js';
+import { assistEnabled } from '../lib/assist.js';
 
 /**
  * Read all config rows as a plain object (values are stored as JSON).
@@ -41,7 +42,8 @@ export async function getConfig(c) {
             statuses: STATUSES,
             topics: options.topics ?? stored.topics ?? [],
             theme: { ...(stored.theme ?? {}), ...(options.theme ?? {}) },
-            allowAnonymousPosts: c.env.ALLOW_ANONYMOUS_POSTS === 'true'
+            allowAnonymousPosts: c.env.ALLOW_ANONYMOUS_POSTS === 'true',
+            assist: { enabled: assistEnabled(c.env) }
         },
         200,
         { 'cache-control': 'public, s-maxage=60' }

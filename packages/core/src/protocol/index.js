@@ -39,7 +39,12 @@ export const EVENT_NAMES = Object.freeze({
     SIMILAR_CLICKED: 'similar_clicked',
     POST_SUBMIT: 'post_submit',
     VOTE: 'vote',
-    EMBED_VIEW: 'embed_view'
+    EMBED_VIEW: 'embed_view',
+    // AI interviewer funnel: offered → answered|skipped → applied.
+    ASSIST_OFFERED: 'assist_offered',
+    ASSIST_ANSWERED: 'assist_answered',
+    ASSIST_SKIPPED: 'assist_skipped',
+    ASSIST_APPLIED: 'assist_applied'
 });
 
 /** Post lifecycle statuses, in roadmap order. */

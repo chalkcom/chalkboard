@@ -45,6 +45,7 @@ import { ingestEvents } from './routes/events.js';
 import { importPosts } from './routes/importer.js';
 import { logout, sso } from './routes/auth.js';
 import { deleteUser, me } from './routes/users.js';
+import { assistInterview, assistSynthesize } from './routes/assist.js';
 
 const HOUR = 3600;
 
@@ -215,6 +216,40 @@ const ROUTES = [
         access: 'public',
         handler: ingestEvents,
         limits: [{ name: 'events', limit: 600, windowSec: HOUR, by: 'ip' }]
+    },
+    {
+        method: 'POST',
+        path: '/api/v1/assist/interview',
+        access: 'member',
+        handler: assistInterview,
+        limits: [
+            {
+                name: 'assist-interview',
+                limit: 10,
+                windowSec: HOUR,
+                by: 'user'
+            },
+            {
+                name: 'assist-interview-ip',
+                limit: 20,
+                windowSec: HOUR,
+                by: 'ip'
+            }
+        ]
+    },
+    {
+        method: 'POST',
+        path: '/api/v1/assist/synthesize',
+        access: 'member',
+        handler: assistSynthesize,
+        limits: [
+            {
+                name: 'assist-synthesize',
+                limit: 10,
+                windowSec: HOUR,
+                by: 'user'
+            }
+        ]
     },
     {
         method: 'POST',

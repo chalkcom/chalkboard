@@ -16,6 +16,7 @@ export default [
                 Headers: 'readonly',
                 URL: 'readonly',
                 URLSearchParams: 'readonly',
+                AbortSignal: 'readonly',
                 TextEncoder: 'readonly',
                 TextDecoder: 'readonly',
                 atob: 'readonly',

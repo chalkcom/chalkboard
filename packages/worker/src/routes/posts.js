@@ -237,7 +237,42 @@ export async function getPostRoute(c) {
         .bind(row.id)
         .all();
     post.tags = tags;
+    if (c.auth?.isStaff) {
+        // The pre-AI draft and Q&A transcript are staff-only context.
+        const interview = await c.env.DB.prepare(
+            'SELECT * FROM post_interviews WHERE post_id = ? LIMIT 1'
+        )
+            .bind(row.id)
+            .first();
+        if (interview) {
+            post.interview = serializeInterview(interview);
+        }
+    }
     return json({ post });
+}
+
+/**
+ * @param {Record<string, unknown>} row post_interviews row
+ * @returns {Record<string, unknown>}
+ */
+function serializeInterview(row) {
+    /** @param {unknown} value */
+    const parse = value => {
+        try {
+            return JSON.parse(String(value));
+        } catch {
+            return null;
+        }
+    };
+    return {
+        originalTitle: row.original_title,
+        originalBody: row.original_body,
+        questions: parse(row.questions_json) ?? [],
+        answers: parse(row.answers_json) ?? [],
+        synthesis: parse(row.synthesis_json),
+        model: row.model,
+        createdAt: row.created_at
+    };
 }
 
 /**
@@ -299,18 +334,12 @@ export async function createPost(c) {
     if (body.topic && !validateTopic(body.topic).ok) {
         return errorResponse('invalid topic', 400);
     }
+    const interview = validateInterviewPayload(body.interview);
+    if (interview instanceof Response) return interview;
     const userId = await requireWriteUser(c.auth, c.env.DB);
     if (!userId) return errorResponse('authentication required', 401);
 
-    const board = body.boardId
-        ? await c.env.DB.prepare(
-              'SELECT id FROM boards WHERE id = ? OR slug = ?'
-          )
-              .bind(body.boardId, body.boardId)
-              .first()
-        : await c.env.DB.prepare(
-              'SELECT id FROM boards ORDER BY position, created_at LIMIT 1'
-          ).first();
+    const board = await resolveBoard(c.env.DB, body.boardId);
     if (!board) return errorResponse('board not found', 400);
 
     const slug = await uniqueSlug(slugify(body.title), async candidate => {
@@ -324,26 +353,143 @@ export async function createPost(c) {
     const id = newId();
     const now = nowIso();
     const source = typeof body.source === 'string' ? body.source : 'board';
-    await c.env.DB.prepare(
-        `INSERT INTO posts (id, board_id, title, body, slug, author_id,
-         source, topic, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-        .bind(
-            id,
-            board.id,
-            String(body.title).trim(),
-            typeof body.body === 'string' ? body.body : '',
-            slug,
-            userId,
-            source.slice(0, 40),
-            body.topic ?? null,
-            now,
-            now
-        )
-        .run();
-    const row = await getPost(c.env.DB, id, userId);
+    const db = c.env.DB;
+    const statements = [
+        db
+            .prepare(
+                `INSERT INTO posts (id, board_id, title, body, slug,
+                 author_id, source, topic, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            )
+            .bind(
+                id,
+                board.id,
+                String(body.title).trim(),
+                typeof body.body === 'string' ? body.body : '',
+                slug,
+                userId,
+                source.slice(0, 40),
+                body.topic ?? null,
+                now,
+                now
+            )
+    ];
+    if (interview) {
+        statements.push(interviewInsertStmt(db, id, body, interview, now));
+    }
+    await db.batch(statements);
+    const row = await getPost(db, id, userId);
     return json({ post: serializePost(row ?? {}, { bodyHtml: true }) }, 201);
+}
+
+/**
+ * @param {any} db
+ * @param {unknown} boardId id or slug; falls back to the first board
+ * @returns {Promise<Record<string, unknown> | null>}
+ */
+async function resolveBoard(db, boardId) {
+    if (boardId) {
+        return db
+            .prepare('SELECT id FROM boards WHERE id = ? OR slug = ?')
+            .bind(boardId, boardId)
+            .first();
+    }
+    return db
+        .prepare('SELECT id FROM boards ORDER BY position, created_at LIMIT 1')
+        .first();
+}
+
+const INTERVIEW_MAX_BYTES = 20 * 1024;
+
+/**
+ * Statement storing the AI-interview record next to a new post. The
+ * submitted title/body are the user-edited synthesis; the original draft
+ * plus Q&A transcript stay staff-visible context.
+ * @param {any} db
+ * @param {string} postId
+ * @param {any} body the create-post request body
+ * @param {NonNullable<ReturnType<typeof validateInterviewPayload>>} interview
+ * @param {string} now
+ */
+function interviewInsertStmt(db, postId, body, interview, now) {
+    return db
+        .prepare(
+            `INSERT INTO post_interviews (id, post_id, original_title,
+             original_body, questions_json, answers_json, synthesis_json,
+             model, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+            newId(),
+            postId,
+            interview.originalTitle,
+            interview.originalBody,
+            JSON.stringify(interview.questions),
+            JSON.stringify(interview.answers),
+            JSON.stringify({
+                title: String(body.title).trim(),
+                body: typeof body.body === 'string' ? body.body : ''
+            }),
+            interview.model,
+            now
+        );
+}
+
+/**
+ * Validate the optional `interview` object on POST /api/v1/posts.
+ * @param {any} interview
+ * @returns {{ originalTitle: string, originalBody: string | null, questions: unknown[], answers: unknown[], model: string | null } | Response | null}
+ *   null when absent, a 400 Response when malformed
+ */
+function validateInterviewPayload(interview) {
+    if (interview === undefined || interview === null) return null;
+    if (!interviewShapeOk(interview)) {
+        return errorResponse('invalid interview', 400);
+    }
+    try {
+        if (JSON.stringify(interview).length > INTERVIEW_MAX_BYTES) {
+            return errorResponse('interview too large', 400);
+        }
+    } catch {
+        return errorResponse('invalid interview', 400);
+    }
+    return {
+        originalTitle: String(interview.originalTitle).trim(),
+        originalBody:
+            typeof interview.originalBody === 'string'
+                ? interview.originalBody
+                : null,
+        questions: interview.questions,
+        answers: interview.answers,
+        model:
+            typeof interview.model === 'string'
+                ? interview.model.slice(0, 64)
+                : null
+    };
+}
+
+/**
+ * @param {any} interview
+ * @returns {boolean}
+ */
+function interviewShapeOk(interview) {
+    if (typeof interview !== 'object' || Array.isArray(interview)) {
+        return false;
+    }
+    if (
+        !validatePost({
+            title: interview.originalTitle,
+            body: interview.originalBody
+        }).ok
+    ) {
+        return false;
+    }
+    return (
+        Array.isArray(interview.questions) &&
+        Array.isArray(interview.answers) &&
+        interview.questions.length <= 3 &&
+        interview.answers.length <= 3
+    );
 }
 
 /**

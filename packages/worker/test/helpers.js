@@ -84,10 +84,13 @@ export function staffJwt(claims = {}) {
 
 /**
  * Build an app instance and a request helper bound to it.
- * @param {Record<string, unknown>} [options]
+ * @param {Record<string, unknown>} [options] createFeedbackApp options
+ * @param {Record<string, unknown>} [envOverrides] extra/replacement env
+ *   bindings for this app (e.g. a fake ANTHROPIC_API_KEY)
  */
-export function makeApp(options = {}) {
+export function makeApp(options = {}, envOverrides = {}) {
     const app = createFeedbackApp(options);
+    const appEnv = { ...env, ...envOverrides };
     /**
      * @param {string} path
      * @param {{ method?: string, jwt?: string, body?: unknown, headers?: Record<string, string> }} [init]
@@ -107,7 +110,7 @@ export function makeApp(options = {}) {
             headers: requestHeaders,
             body: body === undefined ? undefined : JSON.stringify(body)
         });
-        return app.fetch(request, env, createExecutionContext());
+        return app.fetch(request, appEnv, createExecutionContext());
     }
     return { app, call };
 }

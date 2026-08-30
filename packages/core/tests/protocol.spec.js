@@ -36,7 +36,11 @@ describe('protocol constants', () => {
                 'post_submit',
                 'similar_clicked',
                 'similar_shown',
-                'vote'
+                'vote',
+                'assist_offered',
+                'assist_answered',
+                'assist_skipped',
+                'assist_applied'
             ].sort()
         );
     });

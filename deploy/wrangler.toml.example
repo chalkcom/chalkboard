@@ -53,6 +53,14 @@ ALLOWED_ORIGINS = "https://app.example.com"
 # 'true' to accept posts from visitors without a JWT/session.
 ALLOW_ANONYMOUS_POSTS = "false"
 
+# AI interviewer (docs/assist.md) — optional, bring your own Anthropic key.
+# Model for follow-up questions + synthesis; default claude-opus-5.
+# Cheaper alternatives: claude-sonnet-5, claude-haiku-4-5.
+# ASSIST_MODEL = "claude-opus-5"
+# Set to 'false' to switch assist off without removing the key.
+# ASSIST_ENABLED = "true"
+
 # Secrets — set these with wrangler, never in this file:
 #   wrangler secret put FEEDBACK_JWT_SECRET   # shared HS256 secret with your app
 #   wrangler secret put IMPORT_TOKEN          # bearer token for POST /api/v1/import
+#   wrangler secret put ANTHROPIC_API_KEY     # enables the AI interviewer (docs/assist.md)

@@ -26,6 +26,10 @@ repo is the code that runs.
   `Featurebase('embed', …)`-compatible call shape for easy migration
 - 💡 **Hints** — inline custom elements that turn "missing something?"
   moments into posts and votes, with impression→submit funnel analytics
+- 🤖 **AI interviewer** (optional, bring your own Anthropic key) — Claude
+  asks up to three follow-up questions on a draft, the user edits the AI
+  synthesis before posting, and staff keep the original + transcript;
+  fully skippable, never blocks posting ([docs/assist.md](docs/assist.md))
 - 🔐 **Bring-your-own identity** — sign a JWT in your app; no separate
   accounts, imported voters are claimed by email on first sign-in
 - 📦 **Import/export** — idempotent bulk import (e.g. from Featurebase),

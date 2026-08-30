@@ -12,7 +12,9 @@ const state = reactive({
     /** @type {string[]} */
     statuses: [],
     /** @type {Array<{ id: string, label: string }>} */
-    topics: []
+    topics: [],
+    /** AI interviewer availability (server-gated by ANTHROPIC_API_KEY). */
+    assist: { enabled: false }
 });
 
 export function useConfig() {
@@ -24,6 +26,7 @@ export function useConfig() {
                 state.boards = config.boards;
                 state.statuses = config.statuses;
                 state.topics = config.topics;
+                state.assist = config.assist ?? { enabled: false };
                 applyTheme(config.theme);
             })
             .catch(() => {

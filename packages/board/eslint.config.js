@@ -12,6 +12,7 @@ export default [
             globals: {
                 window: 'readonly',
                 document: 'readonly',
+                navigator: 'readonly',
                 fetch: 'readonly',
                 Headers: 'readonly',
                 Request: 'readonly',
