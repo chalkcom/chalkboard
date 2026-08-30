@@ -40,7 +40,8 @@ describe('protocol constants', () => {
                 'assist_offered',
                 'assist_answered',
                 'assist_skipped',
-                'assist_applied'
+                'assist_applied',
+                'assist_deflected'
             ].sort()
         );
     });

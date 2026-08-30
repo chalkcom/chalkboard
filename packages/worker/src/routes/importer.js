@@ -7,36 +7,9 @@
 import { slugify, uniqueSlug, newId } from '@chalkcom/core/slug';
 import { validatePost } from '@chalkcom/core/validate';
 import { json, errorResponse, readJson, nowIso } from '../lib/http.js';
+import { secretsEqual } from '../lib/auth.js';
 
 const MAX_POSTS = 100;
-
-/**
- * Compare two secrets without leaking match position or length through
- * timing: HMAC both with a fixed key, then compare the fixed-size digests
- * byte-for-byte with a constant-time fold.
- * @param {string} a
- * @param {string} b
- * @returns {Promise<boolean>}
- */
-async function secretsEqual(a, b) {
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-        'raw',
-        encoder.encode('chalkboard-import-token-compare'),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-    );
-    const [da, db] = await Promise.all([
-        crypto.subtle.sign('HMAC', key, encoder.encode(a)),
-        crypto.subtle.sign('HMAC', key, encoder.encode(b))
-    ]);
-    const va = new Uint8Array(da);
-    const vb = new Uint8Array(db);
-    let diff = 0;
-    for (let i = 0; i < va.length; i += 1) diff |= va[i] ^ vb[i];
-    return diff === 0;
-}
 
 /**
  * @param {import('../lib/router.js').RouteContext} c

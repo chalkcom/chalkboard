@@ -44,7 +44,9 @@ export const EVENT_NAMES = Object.freeze({
     ASSIST_OFFERED: 'assist_offered',
     ASSIST_ANSWERED: 'assist_answered',
     ASSIST_SKIPPED: 'assist_skipped',
-    ASSIST_APPLIED: 'assist_applied'
+    ASSIST_APPLIED: 'assist_applied',
+    /** "This might already exist" resolved the need — no post created. */
+    ASSIST_DEFLECTED: 'assist_deflected'
 });
 
 /** Post lifecycle statuses, in roadmap order. */

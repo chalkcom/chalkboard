@@ -154,3 +154,31 @@ export async function requireWriteUser(auth, db) {
 }
 
 /** @typedef {import('@cloudflare/workers-types').D1Database} D1Database */
+
+/**
+ * Compare two secrets without leaking match position or length through
+ * timing: HMAC both with a fixed key, then compare the fixed-size digests
+ * byte-for-byte with a constant-time fold.
+ * @param {string} a
+ * @param {string} b
+ * @returns {Promise<boolean>}
+ */
+export async function secretsEqual(a, b) {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+        'raw',
+        enc.encode('chalkboard-secret-compare'),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+    );
+    const [da, db] = await Promise.all([
+        crypto.subtle.sign('HMAC', key, enc.encode(a)),
+        crypto.subtle.sign('HMAC', key, enc.encode(b))
+    ]);
+    const va = new Uint8Array(da);
+    const vb = new Uint8Array(db);
+    let diff = 0;
+    for (let i = 0; i < va.length; i += 1) diff |= va[i] ^ vb[i];
+    return diff === 0;
+}

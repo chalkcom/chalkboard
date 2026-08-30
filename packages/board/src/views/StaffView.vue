@@ -8,6 +8,13 @@ const queue = ref([]);
 const metrics = ref(null);
 const ready = ref(false);
 
+// Interviewer briefing (assist.context config row).
+const briefing = ref('');
+const briefingSource = ref('none');
+const briefingSaving = ref(false);
+const briefingStatus = ref('');
+const BRIEFING_CAP = 16000;
+
 const isStaff = computed(() => session.user?.isStaff === true);
 
 const FILTERS = [
@@ -29,9 +36,35 @@ onMounted(async () => {
         loadQueue(),
         api('/api/v1/staff/metrics').then(res => {
             metrics.value = res;
-        })
+        }),
+        api('/api/v1/staff/assist')
+            .then(res => {
+                briefing.value = res.context;
+                briefingSource.value = res.source;
+            })
+            .catch(() => {})
     ]);
 });
+
+async function saveBriefing() {
+    if (briefingSaving.value) return;
+    briefingSaving.value = true;
+    briefingStatus.value = '';
+    try {
+        await api('/api/v1/config', {
+            method: 'PUT',
+            body: JSON.stringify({ 'assist.context': briefing.value })
+        });
+        briefingStatus.value = 'Saved.';
+        if (briefingSource.value === 'none' && briefing.value.trim()) {
+            briefingSource.value = 'config';
+        }
+    } catch {
+        briefingStatus.value = 'Could not save — check the length and retry.';
+    } finally {
+        briefingSaving.value = false;
+    }
+}
 
 watch(filter, loadQueue);
 </script>
@@ -70,6 +103,51 @@ watch(filter, loadQueue);
                     Queue is clear. 🎉
                 </p>
             </div>
+
+            <section
+                class="mt-8 rounded-cb border border-edge bg-surface-raised p-4"
+                aria-label="Interviewer"
+            >
+                <h2 class="text-lg font-semibold">Interviewer</h2>
+                <p class="mt-1 text-sm text-muted">
+                    Product briefing for the AI interviewer: terminology, what
+                    the product does, what already exists. Used as reference
+                    data on every interview and synthesis.
+                </p>
+                <p
+                    v-if="briefingSource === 'option'"
+                    class="mt-2 text-xs text-amber-700"
+                    data-briefing-override-note
+                >
+                    A code-level option (createFeedbackApp assist.context) is
+                    currently overriding this saved value.
+                </p>
+                <textarea
+                    v-model="briefing"
+                    rows="8"
+                    :maxlength="BRIEFING_CAP"
+                    class="mt-3 w-full rounded-cb border border-edge bg-surface px-3 py-2 font-mono text-xs"
+                    placeholder="e.g. StoreKit is a hospitality ordering platform. 'Menu' means…"
+                    data-briefing-input
+                ></textarea>
+                <div class="mt-1 flex items-center gap-3">
+                    <button
+                        type="button"
+                        class="rounded-cb bg-brand px-3 py-1.5 text-sm font-medium text-brand-contrast"
+                        :disabled="briefingSaving"
+                        data-briefing-save
+                        @click="saveBriefing"
+                    >
+                        {{ briefingSaving ? 'Saving…' : 'Save briefing' }}
+                    </button>
+                    <span class="text-xs text-muted">
+                        {{ briefing.length }} / {{ BRIEFING_CAP }}
+                    </span>
+                    <span v-if="briefingStatus" class="text-xs text-muted">
+                        {{ briefingStatus }}
+                    </span>
+                </div>
+            </section>
 
             <template v-if="metrics">
                 <h2 class="mt-8 text-lg font-semibold">Metrics</h2>

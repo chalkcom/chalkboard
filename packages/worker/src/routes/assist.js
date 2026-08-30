@@ -3,18 +3,27 @@
  * then a user-reviewed synthesis. The interview fails OPEN (empty question
  * list) so submitting is never blocked; synthesis failures return 502 and
  * the UI falls back to posting the original draft.
+ *
+ * The model is grounded in three inputs, all data-not-instructions: the
+ * owner-written product briefing (assist.context + per-topic addenda),
+ * board context (similar posts with status and the latest team reply) and
+ * documentation excerpts from the knowledge base.
  */
 
 import { validatePost, validateTopic } from '@chalkcom/core/validate';
 import { json, errorResponse, readJson } from '../lib/http.js';
 import { toFtsQuery } from '../lib/db.js';
 import { readConfigRows } from './config.js';
+import { retrieveKnowledge } from './knowledge.js';
 import {
     QUESTIONS_SCHEMA,
     SYNTHESIS_SCHEMA,
     assistEnabled,
+    buildSystemPrompt,
     callAssist,
-    resolveAssistModel
+    resolveAssistContext,
+    resolveAssistModel,
+    resolveTopicContext
 } from '../lib/assist.js';
 
 const MAX_QUESTIONS = 3;
@@ -48,17 +57,21 @@ function checkDraft(body) {
 }
 
 /**
- * Titles of up to five FTS-similar live posts, as context for the model
- * and duplicate hints for the UI.
+ * Up to five FTS-similar live posts with the board context the model needs
+ * to confirm duplicates: status, votes, and the newest team reply.
  * @param {import('../lib/router.js').RouteContext} c
  * @param {string} title
- * @returns {Promise<Array<{ id: string, slug: string, title: string }>>}
+ * @returns {Promise<Array<{ id: string, slug: string, title: string, status: string, voteCount: number, latestTeamReply: string | null }>>}
  */
-async function similarTitles(c, title) {
+async function similarPostsContext(c, title) {
     const match = toFtsQuery(title);
     if (!match) return [];
     const { results } = await c.env.DB.prepare(
-        `SELECT p.id, p.slug, p.title
+        `SELECT p.id, p.slug, p.title, p.status, p.vote_count,
+           (SELECT substr(cm.body, 1, 300) FROM comments cm
+            WHERE cm.post_id = p.id AND cm.is_team = 1
+              AND cm.deleted_at IS NULL
+            ORDER BY cm.created_at DESC LIMIT 1) AS latest_team_reply
          FROM posts_fts f JOIN posts p ON p.id = f.post_id
          WHERE posts_fts MATCH ?
            AND p.deleted_at IS NULL AND p.merged_into_id IS NULL
@@ -69,20 +82,33 @@ async function similarTitles(c, title) {
     return results.map(row => ({
         id: String(row.id),
         slug: String(row.slug),
-        title: String(row.title)
+        title: String(row.title),
+        status: String(row.status),
+        voteCount: Number(row.vote_count),
+        latestTeamReply: row.latest_team_reply
+            ? String(row.latest_team_reply)
+            : null
     }));
 }
 
 /**
+ * Shared model-call plumbing for both routes: resolves model + briefing,
+ * gathers grounding (similar posts already fetched; knowledge here) and
+ * calls the transport.
  * @param {import('../lib/router.js').RouteContext} c
  * @param {any} body
- * @param {Array<{ title: string }>} similar
+ * @param {Array<object>} similar
+ * @param {object} schema
+ * @param {'interview' | 'synthesize'} mode
  */
 async function resolveCall(c, body, similar, schema, mode) {
-    const model = resolveAssistModel(
-        c.env,
-        c.options,
-        await readConfigRows(c.env.DB)
+    const stored = await readConfigRows(c.env.DB);
+    const model = resolveAssistModel(c.env, c.options, stored);
+    const briefing = resolveAssistContext(c.options, stored);
+    const topicContext = resolveTopicContext(c.options, stored, body.topic);
+    const knowledge = await retrieveKnowledge(
+        c.env.DB,
+        `${body.title} ${typeof body.body === 'string' ? body.body : ''}`
     );
     const transport =
         /** @type {any} */ (c.options)?.assist?.transport ?? fetch;
@@ -91,6 +117,7 @@ async function resolveCall(c, body, similar, schema, mode) {
         model,
         schema,
         transport,
+        system: buildSystemPrompt(briefing.context, topicContext),
         payload: {
             mode,
             draft: {
@@ -99,7 +126,14 @@ async function resolveCall(c, body, similar, schema, mode) {
             },
             topic: body.topic ?? null,
             locale: typeof body.locale === 'string' ? body.locale : null,
-            similarPostTitles: similar.map(post => post.title),
+            similarPosts: similar.map(post => ({
+                title: post.title,
+                slug: post.slug,
+                status: post.status,
+                voteCount: post.voteCount,
+                latestTeamReply: post.latestTeamReply
+            })),
+            knowledge,
             ...(mode === 'synthesize' ? { answers: body.answers } : {})
         }
     });
@@ -107,8 +141,9 @@ async function resolveCall(c, body, similar, schema, mode) {
 }
 
 /**
- * POST /api/v1/assist/interview — up to three follow-up questions, or an
- * empty list on any failure so the submit flow proceeds unassisted.
+ * POST /api/v1/assist/interview — up to three follow-up questions (and,
+ * when the docs clearly cover the ask, an existing-feature deflection), or
+ * an empty list on any failure so the submit flow proceeds unassisted.
  * @param {import('../lib/router.js').RouteContext} c
  */
 export async function assistInterview(c) {
@@ -118,7 +153,7 @@ export async function assistInterview(c) {
     const invalid = checkDraft(body);
     if (invalid) return invalid;
 
-    const similar = await similarTitles(c, String(body.title));
+    const similar = await similarPostsContext(c, String(body.title));
     const { result, model } = await resolveCall(
         c,
         body,
@@ -126,7 +161,12 @@ export async function assistInterview(c) {
         QUESTIONS_SCHEMA,
         'interview'
     );
-    return json({ questions: sanitizeQuestions(result), model });
+    const existingFeature = sanitizeExistingFeature(result);
+    return json({
+        questions: sanitizeQuestions(result),
+        ...(existingFeature ? { existingFeature } : {}),
+        model
+    });
 }
 
 /**
@@ -146,6 +186,22 @@ function sanitizeQuestions(result) {
         if (questions.length === MAX_QUESTIONS) break;
     }
     return questions;
+}
+
+/**
+ * @param {unknown} result
+ * @returns {{ summary: string, url: string | null } | null}
+ */
+function sanitizeExistingFeature(result) {
+    const raw = /** @type {any} */ (result)?.existingFeature;
+    if (!raw || typeof raw.summary !== 'string' || !raw.summary.trim()) {
+        return null;
+    }
+    const url =
+        typeof raw.url === 'string' && /^https?:\/\//.test(raw.url)
+            ? raw.url.slice(0, 500)
+            : null;
+    return { summary: raw.summary.trim().slice(0, 500), url };
 }
 
 /**
@@ -186,7 +242,7 @@ export async function assistSynthesize(c) {
     const answers = sanitizeAnswers(body.answers ?? []);
     if (!answers) return errorResponse('invalid answers', 400);
 
-    const similar = await similarTitles(c, String(body.title));
+    const similar = await similarPostsContext(c, String(body.title));
     const { result, model } = await resolveCall(
         c,
         { ...body, answers },
@@ -214,7 +270,30 @@ export async function assistSynthesize(c) {
             body: synthesis.body,
             ...(suggestedTopic ? { suggestedTopic } : {})
         },
-        duplicates: similar.slice(0, 3),
+        duplicates: similar.slice(0, 3).map(post => ({
+            id: post.id,
+            slug: post.slug,
+            title: post.title,
+            status: post.status
+        })),
         model
+    });
+}
+
+/**
+ * GET /api/v1/staff/assist — staff-only read of the interviewer briefing
+ * (the public config endpoint only ever exposes contextSource).
+ * @param {import('../lib/router.js').RouteContext} c
+ */
+export async function staffAssistContext(c) {
+    const stored = await readConfigRows(c.env.DB);
+    const resolved = resolveAssistContext(c.options, stored);
+    const row = /** @type {any} */ (stored)['assist.context'];
+    return json({
+        source: resolved.source,
+        // The stored row, editable via PUT /api/v1/config — shown even
+        // when a code-level option overrides it, so staff see both.
+        context: typeof row === 'string' ? row : '',
+        effectiveContext: resolved.context
     });
 }

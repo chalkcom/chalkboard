@@ -28,6 +28,10 @@ let similarTimer;
 const stage = ref('draft');
 const questions = ref([]);
 const assistBusy = ref(false);
+/** @type {import('vue').Ref<null | { summary: string, url: string | null }>} */
+const existingFeature = ref(null);
+/** @type {import('vue').Ref<Array<{ id: string, slug: string, title: string, status: string }>>} */
+const duplicates = ref([]);
 /** @type {import('vue').Ref<null | { originalTitle: string, originalBody: string, questions: object[], answers: object[], model: string | null }>} */
 const interviewPayload = ref(null);
 
@@ -114,19 +118,7 @@ async function submitDraft() {
                 locale: navigator.language || undefined
             })
         });
-        if (Array.isArray(res.questions) && res.questions.length > 0) {
-            questions.value = res.questions;
-            interviewPayload.value = {
-                originalTitle: title.value.trim(),
-                originalBody: body.value,
-                questions: res.questions,
-                answers: [],
-                model: res.model ?? null
-            };
-            stage.value = 'interview';
-            trackEvent(EVENT_NAMES.ASSIST_OFFERED, {});
-            return;
-        }
+        if (enterInterviewStage(res)) return;
     } catch {
         // Assist is best-effort; fall through to a plain post.
     } finally {
@@ -136,11 +128,53 @@ async function submitDraft() {
     await postNow();
 }
 
+/**
+ * Move to the interview stage when the response has anything to show.
+ * @param {any} res interview response
+ * @returns {boolean} whether the stage changed
+ */
+function enterInterviewStage(res) {
+    const gotQuestions =
+        Array.isArray(res.questions) && res.questions.length > 0;
+    const gotDeflection = Boolean(res.existingFeature?.summary);
+    if (!gotQuestions && !gotDeflection) return false;
+    questions.value = gotQuestions ? res.questions : [];
+    existingFeature.value = gotDeflection ? res.existingFeature : null;
+    interviewPayload.value = gotQuestions
+        ? {
+              originalTitle: title.value.trim(),
+              originalBody: body.value,
+              questions: res.questions,
+              answers: [],
+              model: res.model ?? null
+          }
+        : null;
+    stage.value = 'interview';
+    trackEvent(EVENT_NAMES.ASSIST_OFFERED, {});
+    return true;
+}
+
 /** "Post as is" from the question card. */
 async function skipAssist() {
     trackEvent(EVENT_NAMES.ASSIST_SKIPPED, {});
     interviewPayload.value = null;
     await postNow();
+}
+
+/** "That solves it" on the existing-feature card: no post is created. */
+function deflect() {
+    trackEvent(EVENT_NAMES.ASSIST_DEFLECTED, {});
+    router.push(embedState.active ? toEmbedPath('/') : '/');
+}
+
+/** "Not quite — continue": dismiss the card, proceed normally. */
+async function dismissDeflection() {
+    existingFeature.value = null;
+    if (questions.value.length === 0) {
+        // Nothing left to ask — the draft goes up as written.
+        interviewPayload.value = null;
+        await postNow();
+    }
 }
 
 /**
@@ -170,6 +204,7 @@ async function improveWithAnswers(answers) {
         if (res.synthesis.suggestedTopic && !topic.value) {
             topic.value = res.synthesis.suggestedTopic;
         }
+        duplicates.value = Array.isArray(res.duplicates) ? res.duplicates : [];
         stage.value = 'review';
     } catch {
         // Synthesis failed — post the original draft with the transcript.
@@ -193,6 +228,28 @@ async function improveWithAnswers(answers) {
             This is an AI draft built from your answers — edit anything before
             posting. Your original wording is kept for the team.
         </p>
+
+        <div
+            v-if="stage === 'review' && duplicates.length > 0"
+            class="mt-2 rounded-cb border border-edge bg-surface-raised p-3"
+            data-assist-duplicates
+        >
+            <p class="text-xs font-medium text-muted">
+                Possibly the same idea — vote instead?
+            </p>
+            <ul class="mt-1 space-y-1">
+                <li v-for="d in duplicates" :key="d.id">
+                    <button
+                        type="button"
+                        class="flex w-full items-center gap-2 text-left text-sm hover:text-brand"
+                        @click="openSimilar(d)"
+                    >
+                        <span class="truncate">{{ d.title }}</span>
+                        <StatusPill :status="d.status" />
+                    </button>
+                </li>
+            </ul>
+        </div>
 
         <template v-if="stage !== 'interview'">
             <label class="mt-4 block text-sm font-medium" for="cb-title"
@@ -268,7 +325,46 @@ async function improveWithAnswers(answers) {
             <p class="text-sm text-muted">
                 <span class="font-medium text-ink">{{ title }}</span>
             </p>
+            <section
+                v-if="existingFeature"
+                class="mt-3 rounded-cb border-2 border-brand bg-surface-raised p-4"
+                data-assist-deflection
+                aria-label="This might already exist"
+            >
+                <h2 class="text-sm font-semibold">
+                    💡 This might already exist
+                </h2>
+                <p class="mt-1 text-sm">{{ existingFeature.summary }}</p>
+                <a
+                    v-if="existingFeature.url"
+                    :href="existingFeature.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="mt-1 inline-block text-sm text-brand underline"
+                >
+                    Read the docs
+                </a>
+                <div class="mt-3 flex gap-2">
+                    <button
+                        type="button"
+                        class="rounded-cb bg-brand px-3 py-1.5 text-sm font-medium text-brand-contrast"
+                        data-assist-deflect
+                        @click="deflect"
+                    >
+                        That solves it
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-cb border border-edge px-3 py-1.5 text-sm"
+                        data-assist-continue
+                        @click="dismissDeflection"
+                    >
+                        Not quite — continue
+                    </button>
+                </div>
+            </section>
             <AssistInterview
+                v-if="!existingFeature && questions.length > 0"
                 class="mt-3"
                 :questions="questions"
                 :busy="assistBusy || submitting"

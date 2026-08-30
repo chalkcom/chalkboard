@@ -62,11 +62,12 @@ describe('assist gating', () => {
     it('is reflected in GET /api/v1/config', async () => {
         const { call: offCall } = makeApp();
         expect((await (await offCall('/api/v1/config')).json()).assist).toEqual(
-            { enabled: false }
+            { enabled: false, contextSource: 'none' }
         );
         const { call: onCall } = makeApp({}, ASSIST_ENV);
         expect((await (await onCall('/api/v1/config')).json()).assist).toEqual({
-            enabled: true
+            enabled: true,
+            contextSource: 'none'
         });
     });
 

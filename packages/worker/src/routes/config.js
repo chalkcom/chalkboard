@@ -2,7 +2,12 @@
 
 import { STATUSES } from '@chalkcom/core/protocol';
 import { json, errorResponse, readJson } from '../lib/http.js';
-import { assistEnabled } from '../lib/assist.js';
+import {
+    MAX_CONTEXT_LENGTH,
+    MAX_TOPIC_CONTEXT_LENGTH,
+    assistEnabled,
+    resolveAssistContext
+} from '../lib/assist.js';
 
 /**
  * Read all config rows as a plain object (values are stored as JSON).
@@ -43,7 +48,12 @@ export async function getConfig(c) {
             topics: options.topics ?? stored.topics ?? [],
             theme: { ...(stored.theme ?? {}), ...(options.theme ?? {}) },
             allowAnonymousPosts: c.env.ALLOW_ANONYMOUS_POSTS === 'true',
-            assist: { enabled: assistEnabled(c.env) }
+            assist: {
+                enabled: assistEnabled(c.env),
+                // Where the interviewer briefing comes from; the briefing
+                // text itself is never exposed here (public + cached).
+                contextSource: resolveAssistContext(options, stored).source
+            }
         },
         200,
         { 'cache-control': 'public, s-maxage=60' }
@@ -59,6 +69,8 @@ export async function putConfig(c) {
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
         return errorResponse('expected a config object', 400);
     }
+    const invalid = validateConfigWrites(/** @type {any} */ (body));
+    if (invalid) return invalid;
     const entries = Object.entries(body).slice(0, 50);
     const db = c.env.DB;
     if (entries.length > 0) {
@@ -74,6 +86,42 @@ export async function putConfig(c) {
         );
     }
     return json({ ok: true, written: entries.length });
+}
+
+/**
+ * Caps on the assist-related config rows.
+ * @param {Record<string, unknown>} body
+ * @returns {Response | null}
+ */
+function validateConfigWrites(body) {
+    const context = body['assist.context'];
+    if (context !== undefined && context !== null) {
+        if (typeof context !== 'string') {
+            return errorResponse('assist.context must be a string', 400);
+        }
+        if (context.length > MAX_CONTEXT_LENGTH) {
+            return errorResponse(
+                `assist.context must be at most ${MAX_CONTEXT_LENGTH} characters`,
+                400
+            );
+        }
+    }
+    if (Array.isArray(body.topics)) {
+        for (const topic of body.topics) {
+            const topicContext = /** @type {any} */ (topic)?.context;
+            if (
+                topicContext !== undefined &&
+                (typeof topicContext !== 'string' ||
+                    topicContext.length > MAX_TOPIC_CONTEXT_LENGTH)
+            ) {
+                return errorResponse(
+                    `topic context must be a string of at most ${MAX_TOPIC_CONTEXT_LENGTH} characters`,
+                    400
+                );
+            }
+        }
+    }
+    return null;
 }
 
 /** @typedef {import('@cloudflare/workers-types').D1Database} D1Database */

@@ -45,7 +45,12 @@ import { ingestEvents } from './routes/events.js';
 import { importPosts } from './routes/importer.js';
 import { logout, sso } from './routes/auth.js';
 import { deleteUser, me } from './routes/users.js';
-import { assistInterview, assistSynthesize } from './routes/assist.js';
+import {
+    assistInterview,
+    assistSynthesize,
+    staffAssistContext
+} from './routes/assist.js';
+import { deleteKnowledge, ingestKnowledge } from './routes/knowledge.js';
 
 const HOUR = 3600;
 
@@ -209,6 +214,25 @@ const ROUTES = [
         path: '/api/v1/staff/metrics',
         access: 'staff',
         handler: staffMetrics
+    },
+    {
+        method: 'GET',
+        path: '/api/v1/staff/assist',
+        access: 'staff',
+        handler: staffAssistContext
+    },
+    {
+        // Auth inside the handler: staff OR the import token (ingest CLI).
+        method: 'POST',
+        path: '/api/v1/knowledge',
+        access: 'public',
+        handler: ingestKnowledge
+    },
+    {
+        method: 'DELETE',
+        path: '/api/v1/knowledge',
+        access: 'staff',
+        handler: deleteKnowledge
     },
     {
         method: 'POST',

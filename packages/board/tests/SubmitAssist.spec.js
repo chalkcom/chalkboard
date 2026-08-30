@@ -213,3 +213,70 @@ describe('submit flow with the AI interviewer', () => {
         expect(postBodies(calls)[0].title).toBe('Resilient');
     });
 });
+
+describe('existing-feature deflection', () => {
+    const DEFLECTION = {
+        questions: [{ id: 'q1', question: 'Still missing anything?' }],
+        existingFeature: {
+            summary: 'CSV export already exists under Reports → Orders.',
+            url: 'https://docs.example.com/exports'
+        },
+        model: 'claude-opus-5'
+    };
+
+    it('renders the card, fires assist_deflected and creates no post', async () => {
+        const { calls } = stubFetch({
+            '/api/v1/config': () => CONFIG,
+            '/api/v1/assist/interview': () => DEFLECTION,
+            '/api/v1/posts': () => ({ post: { id: 'x', slug: 'x' } })
+        });
+        const wrapper = await mountSubmit();
+        await wrapper.find('#cb-title').setValue('csv export?');
+        await wrapper.find('form').trigger('submit');
+        await vi.waitFor(() => {
+            expect(wrapper.find('[data-assist-deflection]').exists()).toBe(
+                true
+            );
+        });
+        expect(wrapper.text()).toContain('This might already exist');
+        expect(wrapper.text()).toContain('Reports → Orders');
+        expect(
+            wrapper.find('[data-assist-deflection] a').attributes('href')
+        ).toBe('https://docs.example.com/exports');
+
+        await wrapper.find('[data-assist-deflect]').trigger('click');
+        await vi.waitFor(() => {
+            expect(eventTypes(calls)).toContain('assist_deflected');
+        });
+        expect(postBodies(calls)).toHaveLength(0);
+        expect(eventTypes(calls)).not.toContain('post_submit');
+    });
+
+    it('"Not quite" dismisses the card and continues to the questions', async () => {
+        const { calls } = stubFetch({
+            '/api/v1/config': () => CONFIG,
+            '/api/v1/assist/interview': () => DEFLECTION,
+            '/api/v1/posts': () => ({ post: { id: 'p9', slug: 'p9' } })
+        });
+        const wrapper = await mountSubmit();
+        await wrapper.find('#cb-title').setValue('csv export?');
+        await wrapper.find('form').trigger('submit');
+        await vi.waitFor(() => {
+            expect(wrapper.find('[data-assist-continue]').exists()).toBe(true);
+        });
+        // Questions are held back until the deflection is resolved.
+        expect(wrapper.find('[data-assist-skip]').exists()).toBe(false);
+
+        await wrapper.find('[data-assist-continue]').trigger('click');
+        await vi.waitFor(() => {
+            expect(wrapper.find('[data-assist-skip]').exists()).toBe(true);
+        });
+        expect(wrapper.text()).toContain('Still missing anything?');
+
+        await wrapper.find('[data-assist-skip]').trigger('click');
+        await vi.waitFor(() => {
+            expect(postBodies(calls)).toHaveLength(1);
+        });
+        expect(eventTypes(calls)).not.toContain('assist_deflected');
+    });
+});
