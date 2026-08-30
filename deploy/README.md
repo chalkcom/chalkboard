@@ -37,6 +37,10 @@ npx wrangler d1 execute feedback --remote --file=./seed.sql
 npx wrangler deploy
 ```
 
+Once deployed, `/sdk-test` on your new domain exercises the embed,
+overlay and hint elements end-to-end — handy for sanity-checking the
+install and your CSP.
+
 Then set the `[vars]` in `wrangler.toml` for your domain:
 
 - `PUBLIC_URL` — where the worker is reachable (used for SSO redirects).
@@ -45,15 +49,34 @@ Then set the `[vars]` in `wrangler.toml` for your domain:
 
 ## Local development
 
+One command from a fresh clone (after `pnpm install`), at the repo root:
+
 ```bash
-cd deploy
-npx wrangler d1 migrations apply feedback --local
-npx wrangler dev          # worker + assembled assets on :8787
+pnpm quickstart
+```
+
+It builds everything, then in `deploy/`: creates `wrangler.toml` and
+`.dev.vars` from their `.example` files when missing, applies migrations
+to the local D1, seeds the demo content (idempotent) and starts
+`wrangler dev` on :8787. Open http://localhost:8787 for the board and
+http://localhost:8787/sdk-test for a page that exercises every SDK
+component — embed, overlay, hint elements — against your local worker,
+including dev-only sign-in so the authenticated flows work.
+
+Day to day, from `deploy/`:
+
+```bash
+pnpm dev          # configure (if needed) + migrate + wrangler dev
+pnpm db:seed      # (re-)apply the demo content; safe to re-run
 # in another terminal, for board hot-reload:
 pnpm --filter @chalkcom/board dev   # Vite on :5173, proxies /api to :8787
 ```
 
-Local dev works without the KV namespace — the rate limiter fails open.
+`.dev.vars` holds local-only secrets (the dev JWT secret the SDK test
+page is prefilled with) and localhost overrides for `PUBLIC_URL`,
+`ALLOWED_ORIGINS` and `ALLOW_ANONYMOUS_POSTS`; wrangler reads it for
+`wrangler dev` only and never deploys it. Local dev works without the KV
+namespace — the rate limiter fails open.
 
 ## Customising
 

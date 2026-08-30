@@ -12,7 +12,8 @@
         "format:check": "prettier --check . && pnpm -r format:check",
         "format": "prettier --write .",
         "test": "pnpm -r test",
-        "build": "pnpm -r build && node deploy/scripts/assemble.mjs"
+        "build": "pnpm -r build && node deploy/scripts/assemble.mjs",
+        "quickstart": "pnpm build && pnpm --filter @chalkcom/deploy quickstart"
     },
     "devDependencies": {
         "@changesets/cli": "^2.29.5",

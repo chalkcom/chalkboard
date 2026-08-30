@@ -107,10 +107,16 @@ Docs: [`docs/embedding.md`](docs/embedding.md) ·
 
 ```bash
 pnpm install
+pnpm quickstart     # local board + demo data + SDK test page on :8787
 pnpm lint && pnpm format:check
 pnpm build          # board + sdk dist, then deploy assembly
 pnpm test           # vitest everywhere; worker tests run in workerd
 ```
+
+`pnpm quickstart` bootstraps a default local deployment (config copied
+from the checked-in examples, migrations, seed) and serves it with
+`wrangler dev`; `/sdk-test` on it demos every embed/overlay/hint
+component. See [`deploy/README.md`](deploy/README.md).
 
 ## License
 

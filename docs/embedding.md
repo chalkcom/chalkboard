@@ -5,6 +5,12 @@ exposes a single global command function, `Chalkboard(command, options)`,
 mirroring the `Featurebase('embed', {...})` call shape so an existing
 Featurebase integration ports with a rename.
 
+Every deployment also serves `/sdk-test` — a self-contained page that
+exercises the embed, overlay and hint elements against that deployment.
+Use it to sanity-check a fresh install (or your CSP) before wiring the
+SDK into your app; on local dev it can mint a dev-only JWT so the
+signed-in flows work too.
+
 ## Loading the SDK
 
 ```html

@@ -23,6 +23,13 @@ importers:
       '@chalkcom/worker':
         specifier: workspace:*
         version: link:../packages/worker
+    devDependencies:
+      prettier:
+        specifier: ^3.6.2
+        version: 3.9.6
+      wrangler:
+        specifier: ^4.42.2
+        version: 4.127.1
 
   packages/board:
     dependencies:

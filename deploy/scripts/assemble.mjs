@@ -1,7 +1,7 @@
 /**
  * Assemble the deployable directory tree next to wrangler.toml:
  *
- *   deploy/dist/        board SPA build + sdk.js + _headers
+ *   deploy/dist/        board SPA build + sdk.js + sdk-test.html + _headers
  *   deploy/migrations/  copied from packages/worker/migrations
  *
  * Run after `pnpm -r build` (the root `pnpm build` does both).
@@ -34,6 +34,9 @@ rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist, { recursive: true });
 cpSync(boardDist, dist, { recursive: true });
 cpSync(sdkBundle, join(dist, 'sdk.js'));
+// The SDK test page: every embed/overlay/hint component on one page,
+// served by the deployment itself at /sdk-test.html.
+cpSync(join(deployDir, 'sdk-test.html'), join(dist, 'sdk-test.html'));
 
 const migrations = join(deployDir, 'migrations');
 rmSync(migrations, { recursive: true, force: true });

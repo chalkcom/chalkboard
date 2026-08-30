@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { api } from '../api.js';
 import { useConfig } from '../composables/useConfig.js';
 import { usePagination } from '../composables/usePagination.js';
@@ -7,9 +8,13 @@ import { embedState, toEmbedPath } from '../embed/embed.js';
 import PostRow from '../components/PostRow.vue';
 
 const config = useConfig();
+const route = useRoute();
 const sort = ref('top');
 const status = ref('');
-const topic = ref(String(embedState.filters.topic ?? ''));
+// The overlay opens the board as /embed?topic=…, so the query is the
+// filter source that exists at mount; init filters arrive later over
+// postMessage (see the watcher below).
+const topic = ref(String(route.query.topic ?? embedState.filters.topic ?? ''));
 const search = ref('');
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let searchTimer;
@@ -42,6 +47,15 @@ const submitLink = computed(() =>
 
 onMounted(reset);
 watch([sort, status, topic], reset);
+// The init message lands after this view mounts, so a one-shot read of
+// embedState.filters would miss it; only an explicit topic may override
+// the URL's.
+watch(
+    () => embedState.filters.topic,
+    value => {
+        if (typeof value === 'string') topic.value = value;
+    }
+);
 watch(search, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(reset, 250);
