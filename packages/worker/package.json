@@ -1,0 +1,33 @@
+{
+    "name": "@chalkcom/worker",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=22"
+    },
+    "exports": {
+        "./app": "./src/index.js"
+    },
+    "files": [
+        "src",
+        "migrations"
+    ],
+    "dependencies": {
+        "@chalkcom/core": "workspace:*"
+    },
+    "scripts": {
+        "lint": "eslint .",
+        "format:check": "prettier --check .",
+        "test": "vitest run",
+        "build": "echo '@chalkcom/worker is consumed from source; nothing to build'"
+    },
+    "devDependencies": {
+        "@cloudflare/vitest-pool-workers": "^0.9.12",
+        "@eslint/js": "^9.34.0",
+        "eslint": "^9.34.0",
+        "prettier": "^3.6.2",
+        "vitest": "^3.2.4",
+        "wrangler": "^4.42.2"
+    }
+}

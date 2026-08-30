@@ -1,0 +1,21 @@
+{
+    "name": "chalkboard",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "packageManager": "pnpm@10.26.2",
+    "engines": {
+        "node": ">=22"
+    },
+    "scripts": {
+        "lint": "pnpm -r lint",
+        "format:check": "prettier --check . && pnpm -r format:check",
+        "format": "prettier --write .",
+        "test": "pnpm -r test",
+        "build": "pnpm -r build && node deploy/scripts/assemble.mjs"
+    },
+    "devDependencies": {
+        "@changesets/cli": "^2.29.5",
+        "prettier": "^3.6.2"
+    }
+}

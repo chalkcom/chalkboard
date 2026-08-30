@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Neutral default theme. The worker's /api/v1/config theme object overrides
+ * these variables at runtime (see src/theme.js), so a self-hosted board can
+ * be re-branded without a rebuild.
+ */
+:root {
+    --cb-brand: #4f46e5;
+    --cb-brand-contrast: #ffffff;
+    --cb-surface: #f8fafc;
+    --cb-surface-raised: #ffffff;
+    --cb-ink: #0f172a;
+    --cb-muted: #64748b;
+    --cb-edge: #e2e8f0;
+    --cb-radius: 0.5rem;
+    --cb-font:
+        ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+        'Helvetica Neue', sans-serif;
+}
+
+body {
+    font-family: var(--cb-font);
+    background: var(--cb-surface);
+    color: var(--cb-ink);
+}
+
+.cb-prose p {
+    margin: 0.5rem 0;
+}
+
+.cb-prose ul {
+    list-style: disc;
+    padding-left: 1.25rem;
+    margin: 0.5rem 0;
+}
+
+.cb-prose a {
+    color: var(--cb-brand);
+    text-decoration: underline;
+}
+
+.cb-prose code {
+    background: var(--cb-surface);
+    border: 1px solid var(--cb-edge);
+    border-radius: 0.25rem;
+    padding: 0 0.25rem;
+    font-size: 0.875em;
+}
+
+.cb-prose pre {
+    background: var(--cb-surface);
+    border: 1px solid var(--cb-edge);
+    border-radius: var(--cb-radius);
+    padding: 0.75rem;
+    overflow-x: auto;
+    margin: 0.5rem 0;
+}

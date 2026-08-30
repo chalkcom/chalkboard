@@ -1,0 +1,13 @@
+{
+    "name": "@chalkcom/deploy",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=22"
+    },
+    "dependencies": {
+        "@chalkcom/core": "workspace:*",
+        "@chalkcom/worker": "workspace:*"
+    }
+}
